@@ -1,0 +1,25 @@
+{
+    "Name": "ifconfig",
+    "Stages": [
+        {
+            "Name": "stage1",
+            "Image": "ubuntu:latest",
+            "Cmd": [
+                "sh"
+            ], 
+            "Stdin": [
+                "ifconfig", ">", "/walrus/stage1/file"
+            ]
+        }, 
+        {
+            "Name": "stage2",
+            "Image": "ubuntu:latest",
+            "Cmd": [
+                "sh"
+            ],
+            "Stdin" : [
+                "grep", "en", "/walrus/stage1/file"
+            ]
+        }
+    ]
+}
