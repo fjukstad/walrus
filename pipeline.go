@@ -1,5 +1,10 @@
 package main
 
+import (
+	"encoding/json"
+	"io/ioutil"
+)
+
 type Pipeline struct {
 	Name   string
 	Stages []Stage
@@ -21,4 +26,14 @@ type Parallelism struct {
 
 type Input struct {
 	Name string
+}
+
+func ParseConfig(filename string) (*Pipeline, error) {
+	p := Pipeline{}
+	file, e := ioutil.ReadFile(filename)
+	if e != nil {
+		return nil, e
+	}
+	err := json.Unmarshal(file, &p)
+	return &p, err
 }

@@ -1,39 +1,67 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"strings"
+
+	"github.com/fsouza/go-dockerclient"
 )
+
+func run(c *docker.Client, filename string) error {
+	p, err := ParseConfig(filename)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Pulling docker images")
+
+	for _, stage := range p.Stages {
+		image := stage.Image
+		repo, tag := getRepoAndTag(image)
+		fmt.Print(repo, ":", tag, "\n")
+		pom := docker.PullImageOptions{Repository: repo,
+			Tag: tag}
+
+		err = c.PullImage(pom, docker.AuthConfiguration{})
+		if err != nil {
+			return err
+		}
+
+	}
+
+	fmt.Println(p)
+	return nil
+}
+
+func getRepoAndTag(pipelineImage string) (repo, tag string) {
+	repoAndTag := strings.Split(pipelineImage, ":")
+	if len(repoAndTag) == 1 {
+		tag = "latest"
+	} else {
+		tag = repoAndTag[1]
+	}
+	repo = repoAndTag[0]
+
+	return repo, tag
+}
 
 func main() {
 	var configFilename = flag.String("f", "pipeline.json", "pipeline description file")
+	var cmd = flag.String("cmd", "run", "walrus command. available commands: 'run'")
+
 	flag.Parse()
 
-	p := Pipeline{}
-	file, e := ioutil.ReadFile(*configFilename)
-	if e != nil {
-		fmt.Printf("File error: %v\n", e)
-		return
+	client, err := docker.NewClientFromEnv()
+	if err != nil {
+		panic(err)
 	}
-	fmt.Printf("%s\n", string(file))
 
-	err := json.Unmarshal(file, &p)
-	fmt.Println("Results", p, err)
+	switch *cmd {
+	case "run":
+		err = run(client, *configFilename)
+	}
 
-	cli, err := client.NewEnvClient()
-    if err != nil {
-        panic(err)
-    }
-
-    containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
-    if err != nil {
-        panic(err)
-    }
-
-    for _, container := range containers {
-        fmt.Printf("%s %s\n", container.ID[:10], container.Image)
-    }
+	fmt.Println(err)
 
 }
