@@ -12,8 +12,10 @@ type Pipeline struct {
 }
 
 type Stage struct {
+	Name        string
 	Image       string
 	Cmd         []string
+	Env         []string
 	Stdin       []string
 	Inputs      []Input
 	Parallelism Parallelism
