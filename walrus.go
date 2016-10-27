@@ -1,14 +1,18 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"strings"
 
-	"github.com/fsouza/go-dockerclient"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/client"
 )
 
-func run(c *docker.Client, filename string) error {
+func run(c *client.Client, filename string) error {
 	p, err := ParseConfig(filename)
 	if err != nil {
 		return err
@@ -17,20 +21,40 @@ func run(c *docker.Client, filename string) error {
 	fmt.Println("Pulling docker images")
 
 	for _, stage := range p.Stages {
-		image := stage.Image
-		repo, tag := getRepoAndTag(image)
+		repo, tag := getRepoAndTag(stage.Image)
+		image := repo + ":" + tag
 		fmt.Print(repo, ":", tag, "\n")
-		pom := docker.PullImageOptions{Repository: repo,
-			Tag: tag}
-
-		err = c.PullImage(pom, docker.AuthConfiguration{})
+		_, err := c.ImagePull(context.Background(), image, types.ImagePullOptions{})
 		if err != nil {
 			return err
 		}
 
+		resp, err := c.ContainerCreate(context.Background(),
+			&container.Config{Image: image,
+				Env: stage.Env,
+				Cmd: stage.Cmd,
+			},
+			&container.HostConfig{},
+			&network.NetworkingConfig{},
+			stage.Name)
+		if err != nil {
+			return err
+		}
+		containerId := resp.ID
+		containerName := stage.Name + "-" + containerId[0:11]
+		err = c.ContainerRename(context.Background(), containerId, containerName)
+		if err != nil {
+			return err
+		}
+
+		err = c.ContainerStart(context.Background(), containerId, types.ContainerStartOptions{})
+		if err != nil {
+			return err
+		}
+		fmt.Println(containerId, err)
+
 	}
 
-	fmt.Println(p)
 	return nil
 }
 
@@ -51,8 +75,7 @@ func main() {
 	var cmd = flag.String("cmd", "run", "walrus command. available commands: 'run'")
 
 	flag.Parse()
-
-	client, err := docker.NewClientFromEnv()
+	client, err := client.NewEnvClient()
 	if err != nil {
 		panic(err)
 	}
