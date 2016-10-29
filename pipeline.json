@@ -5,10 +5,10 @@
             "Name": "stage1",
             "Image": "ubuntu:latest",
             "Cmd": [
-                "sh"
+                "sh" 
             ], 
             "Stdin": [
-                "ifconfig", ">", "/walrus/stage1/file"
+                "ls / > /walrus/stage1/file"
             ]
         }, 
         {
@@ -18,7 +18,10 @@
                 "sh"
             ],
             "Stdin" : [
-                "grep", "en", "/walrus/stage1/file"
+                "grep bin /walrus/stage1/file > /walrus/stage2/file2"
+            ],
+            "Inputs" : [
+                "stage1"
             ]
         }
     ]

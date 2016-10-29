@@ -17,17 +17,13 @@ type Stage struct {
 	Cmd         []string
 	Env         []string
 	Stdin       []string
-	Inputs      []Input
+	Inputs      []string
 	Parallelism Parallelism
 }
 
 type Parallelism struct {
 	Strategy string
 	Constant int
-}
-
-type Input struct {
-	Name string
 }
 
 func ParseConfig(filename string) (*Pipeline, error) {
