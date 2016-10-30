@@ -14,18 +14,10 @@ import (
 	"github.com/docker/docker/client"
 )
 
-func run(c *client.Client, rootpath, filename string) error {
-	p, err := ParseConfig(filename)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("Pulling docker images")
-
+func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 	for _, stage := range p.Stages {
 		repo, tag := getRepoAndTag(stage.Image)
 		image := repo + ":" + tag
-		fmt.Print(repo, ":", tag, "\n")
 		_, err := c.ImagePull(context.Background(), image, types.ImagePullOptions{})
 		if err != nil {
 			return err
@@ -33,13 +25,10 @@ func run(c *client.Client, rootpath, filename string) error {
 
 		mountpath := "/walrus/" + stage.Name
 		hostpath := rootpath + "/" + stage.Name
-
-		err = os.MkdirAll(hostpath, 06444)
+		err = os.MkdirAll(hostpath, 0777)
 		if err != nil {
 			return err
 		}
-
-		fmt.Println(stage.Env, stage.Cmd, stage.Stdin)
 
 		resp, err := c.ContainerCreate(context.Background(),
 			&container.Config{Image: image,
@@ -82,7 +71,6 @@ func run(c *client.Client, rootpath, filename string) error {
 		}
 		input := strings.Join(stage.Stdin, "\n")
 		input = input + "\n"
-		fmt.Println(input)
 		_, err = hijackedResp.Conn.Write([]byte(input))
 		if err != nil {
 			return err
@@ -90,6 +78,22 @@ func run(c *client.Client, rootpath, filename string) error {
 
 	}
 
+	return nil
+}
+
+// Stops any previously run pipeline and deletes the containers.
+func stopPreviousRun(c *client.Client, stages []Stage) error {
+	for _, stage := range stages {
+		err := c.ContainerStop(context.Background(), stage.Name, nil)
+		if err != nil {
+			return err
+		}
+
+		err = c.ContainerRemove(context.Background(), stage.Name, types.ContainerRemoveOptions{})
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -135,6 +139,7 @@ func main() {
 	var cmd = flag.String("cmd", "run", "walrus command. available commands: 'run'")
 	var outputDir = flag.String("output", ".", "where walrus should store output data on the host")
 
+	flag.Parse()
 	var mountpath = "/walrus"
 
 	hostpath, err := filepath.Abs(*outputDir)
@@ -148,9 +153,19 @@ func main() {
 		panic(err)
 	}
 
+	p, err := ParseConfig(*configFilename)
+	if err != nil {
+		panic(err)
+	}
+
+	err = stopPreviousRun(client, p.Stages)
+	if err != nil {
+		panic(err)
+	}
+
 	switch *cmd {
 	case "run":
-		err = run(client, hostpath, *configFilename)
+		err = run(client, p, hostpath, *configFilename)
 	case "init":
 		err = initWalrus(client, hostpath, mountpath)
 	}
