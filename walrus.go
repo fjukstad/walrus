@@ -97,21 +97,6 @@ func getInputVolumes(inputs []string, hostpath string) (volumes []string) {
 	return volumes
 }
 
-func initWalrus(c *client.Client, hostpath, mountpath string) error {
-	fmt.Println(hostpath, mountpath)
-	volume := hostpath + ":" + mountpath
-	_, err := c.ContainerCreate(context.Background(),
-		&container.Config{Image: "ubuntu:14.04"},
-		&container.HostConfig{Binds: []string{volume}},
-		&network.NetworkingConfig{},
-		"walrus")
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func getRepoAndTag(pipelineImage string) (repo, tag string) {
 	repoAndTag := strings.Split(pipelineImage, ":")
 	if len(repoAndTag) == 1 {
@@ -246,8 +231,6 @@ func main() {
 	switch *cmd {
 	case "run":
 		err = run(client, p, hostpath, *configFilename)
-	case "init":
-		err = initWalrus(client, hostpath, mountpath)
 	}
 
 	if err != nil {
