@@ -16,6 +16,11 @@ import (
 )
 
 func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
+	// generate a version number/name if the pipeline description didn't
+	if p.Version == "" {
+		p.Version = createName()
+	}
+
 	for _, stage := range p.Stages {
 		repo, tag := getRepoAndTag(stage.Image)
 		image := repo + ":" + tag
@@ -123,7 +128,7 @@ func getRepoAndTag(pipelineImage string) (repo, tag string) {
 // output directory specified by the user. Can be used to determine what
 // produced the output in the output directory.
 func saveConfiguration(hostpath string, p *Pipeline) error {
-	configPath := hostpath + "/" + ".walrus"
+	configPath := createConfigPath(hostpath)
 	err := os.Mkdir(configPath, 0777)
 	if err != nil {
 		return err
@@ -146,6 +151,65 @@ func saveConfiguration(hostpath string, p *Pipeline) error {
 
 	return nil
 
+}
+
+// Moves the output of the previous runs into new folders for each stage. The
+// names are STAGENAME-VERSION.
+func savePreviousRun(hostpath string) error {
+
+	// Check if there is any output from the previous runs
+	f, err := os.Open(hostpath)
+	if err != nil {
+		// Output dir does not exist, nothing to back up.
+		if os.IsNotExist(err) {
+			return nil
+		}
+
+		return err
+	}
+	files, err := f.Readdir(-1)
+	if err != nil {
+		return err
+	}
+
+	// No files in output directory, nothing to back up
+	if len(files) == 0 {
+		return nil
+	}
+
+	// Read old pipeline description to get it's version (use it for renaming)
+	configPath := createConfigPath(hostpath)
+	configFilename := configPath + "/" + "pipeline.json"
+	p, err := ParseConfig(configFilename)
+	if err != nil {
+		return err
+	}
+
+	absPath, err := filepath.Abs(hostpath)
+	if err != nil {
+		return err
+	}
+
+	for _, file := range files {
+		if file.IsDir() {
+			// Checks if directory name is a single word, i.e. a stage name that
+			// has not yet been 'backed up' yet.
+			if len(strings.Split(file.Name(), "-")) == 1 {
+				oldFile := absPath + "/" + file.Name()
+				newFile := absPath + "/" + file.Name() + "-" + p.Version
+				err = os.Rename(oldFile, newFile)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// Returns the full path of the  walrus configuration directory
+func createConfigPath(hostpath string) string {
+	return hostpath + "/" + ".walrus"
 }
 
 func main() {
@@ -173,6 +237,11 @@ func main() {
 	}
 
 	stopPreviousRun(client, p.Stages)
+	err = savePreviousRun(hostpath)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	switch *cmd {
 	case "run":
@@ -181,7 +250,12 @@ func main() {
 		err = initWalrus(client, hostpath, mountpath)
 	}
 
-	saveConfiguration(hostpath, p)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	err = saveConfiguration(hostpath, p)
 
 	if err != nil {
 		fmt.Println(err)

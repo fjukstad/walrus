@@ -18,5 +18,8 @@
                 "stage1"
             ]
         }
-    ]
+    ],
+    "Cache": false,
+    "Version": "",
+    "Comment": "This is the first example pipeline!"
 }
