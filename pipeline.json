@@ -5,20 +5,14 @@
             "Name": "stage1",
             "Image": "ubuntu:latest",
             "Cmd": [
-                "sh" 
-            ], 
-            "Stdin": [
-                "ls / > /walrus/stage1/file"
+                "sh", "-c", "ls / > /walrus/stage1/file"
             ]
         }, 
         {
             "Name": "stage2",
             "Image": "ubuntu:14.04",
             "Cmd": [
-                "sh"
-            ],
-            "Stdin" : [
-                "grep bin /walrus/stage1/file > /walrus/stage2/file2"
+                "sh", "-c", "grep bin /walrus/stage1/file > /walrus/stage2/file2"
             ],
             "Inputs" : [
                 "stage1"

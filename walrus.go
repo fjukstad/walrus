@@ -32,13 +32,8 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 
 		resp, err := c.ContainerCreate(context.Background(),
 			&container.Config{Image: image,
-				Env:          stage.Env,
-				Cmd:          stage.Cmd,
-				AttachStdin:  true,
-				AttachStdout: true,
-				AttachStderr: true,
-				OpenStdin:    true,
-				Tty:          true,
+				Env: stage.Env,
+				Cmd: stage.Cmd,
 			},
 			&container.HostConfig{
 				Binds:       []string{hostpath + ":" + mountpath},
@@ -50,12 +45,6 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 			return err
 		}
 		containerId := resp.ID
-		// containerName := stage.Name + "-" + containerId[0:11]
-		// err = c.ContainerRename(context.Background(), containerId, containerName)
-		// if err != nil {
-		// 	return err
-		// }
-
 		err = c.ContainerStart(context.Background(), containerId,
 			types.ContainerStartOptions{})
 
@@ -63,38 +52,20 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 			return err
 		}
 
-		hijackedResp, err := c.ContainerAttach(context.Background(), containerId, types.ContainerAttachOptions{
-			Stream: true,
-			Stdin:  true})
+		_, err = c.ContainerWait(context.Background(), containerId)
 		if err != nil {
 			return err
 		}
-		input := strings.Join(stage.Stdin, "\n")
-		input = input + "\n"
-		_, err = hijackedResp.Conn.Write([]byte(input))
-		if err != nil {
-			return err
-		}
-
 	}
-
 	return nil
 }
 
 // Stops any previously run pipeline and deletes the containers.
-func stopPreviousRun(c *client.Client, stages []Stage) error {
+func stopPreviousRun(c *client.Client, stages []Stage) {
 	for _, stage := range stages {
-		err := c.ContainerStop(context.Background(), stage.Name, nil)
-		if err != nil {
-			return err
-		}
-
-		err = c.ContainerRemove(context.Background(), stage.Name, types.ContainerRemoveOptions{})
-		if err != nil {
-			return err
-		}
+		c.ContainerStop(context.Background(), stage.Name, nil)
+		c.ContainerRemove(context.Background(), stage.Name, types.ContainerRemoveOptions{})
 	}
-	return nil
 }
 
 // Generate a list of volume mounts on the form
@@ -158,10 +129,7 @@ func main() {
 		panic(err)
 	}
 
-	err = stopPreviousRun(client, p.Stages)
-	if err != nil {
-		panic(err)
-	}
+	stopPreviousRun(client, p.Stages)
 
 	switch *cmd {
 	case "run":
@@ -170,6 +138,11 @@ func main() {
 		err = initWalrus(client, hostpath, mountpath)
 	}
 
-	fmt.Println(err)
+	if err != nil {
+		fmt.Println(err)
+		return
+	} else {
+		fmt.Println("Pipeline done. Have a look in ", hostpath, "for your results")
+	}
 
 }
