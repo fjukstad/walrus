@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -25,6 +26,10 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 
 		mountpath := "/walrus/" + stage.Name
 		hostpath := rootpath + "/" + stage.Name
+
+		// Note the 0777 permission bits. We use such liberal bits since
+		// we do not know about the users within the docker containers that
+		// are going to be run. We want to fix this later!
 		err = os.MkdirAll(hostpath, 0777)
 		if err != nil {
 			return err
@@ -57,6 +62,15 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 			return err
 		}
 	}
+
+	// Restore permission bits to output directory
+	// err := filepath.Walk(rootpath, func(name string, info os.FileInfo, err error) error {
+	// 	return os.Chmod(name, 0666)
+	// })
+	// if err != nil {
+	// 	return err
+	// }
+
 	return nil
 }
 
@@ -105,6 +119,35 @@ func getRepoAndTag(pipelineImage string) (repo, tag string) {
 	return repo, tag
 }
 
+// Saves the pipeline configuration (json) to a new .walrus directory in the
+// output directory specified by the user. Can be used to determine what
+// produced the output in the output directory.
+func saveConfiguration(hostpath string, p *Pipeline) error {
+	configPath := hostpath + "/" + ".walrus"
+	err := os.Mkdir(configPath, 0777)
+	if err != nil {
+		return err
+	}
+
+	filename := configPath + "/" + "pipeline.json"
+	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	b, err := json.Marshal(p)
+	if err != nil {
+		return err
+	}
+
+	_, err = f.Write(b)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
 func main() {
 	var configFilename = flag.String("f", "pipeline.json", "pipeline description file")
 	var cmd = flag.String("cmd", "run", "walrus command. available commands: 'run'")
@@ -137,6 +180,8 @@ func main() {
 	case "init":
 		err = initWalrus(client, hostpath, mountpath)
 	}
+
+	saveConfiguration(hostpath, p)
 
 	if err != nil {
 		fmt.Println(err)
