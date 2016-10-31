@@ -1,5 +1,6 @@
 # Walrus
-Data analysis pipelines on a single Docker host
+Data analysis pipelines on a single Docker host. Not really anything more than a
+shell script. 
 
 # Name
 Because every data analysis framework has to be named after a big animal.
