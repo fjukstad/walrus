@@ -36,5 +36,5 @@ stages:
   inputs:
   - stage1
 cache: false
-version: model-anchovy
+version: 0.1
 comment: This is the first example pipeline!
