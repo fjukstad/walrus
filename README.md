@@ -1,7 +1,9 @@
 # Walrus
 Walrus is a small tool I built to run data analysis pipelines using Docker
 containers. It is very simple: Walrus reads a pipeline description from either a
-JSON or YAML file and starts Docker containers as described in this file. 
+JSON or YAML file and starts Docker containers as described in this file. It's
+really nothing more than a fancy shell script to start Docker containers.
+
 
 ## Pipeline 
 A pipeline has a *name*, a list of *pipeline stages*, a *version*, and a
@@ -22,8 +24,9 @@ on start-up at `/walrus/INPUT_STAGENAME`. The user specifies where this
 On default it writes everything to a `walrus` directory in the current working
 directory of where the user executes the walrus command. 
 
-Walrus also writes the pipeline description to a `walrus/.walrus` directory on
-the host. 
+Walrus also writes the pipeline description to the output `walrus/.walrus`
+directory on the host if users want to investigate the pipeline that created the
+output. 
 
 ## Parallelism
 Pipeline stages that could be run in parallel are run in parallel by default. 
