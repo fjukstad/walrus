@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
+	"path/filepath"
 	"regexp"
+
+	"gopkg.in/yaml.v2"
 )
 
 type Pipeline struct {
@@ -36,10 +39,20 @@ func ParseConfig(filename string) (*Pipeline, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = json.Unmarshal(file, &p)
+
+	extension := filepath.Ext(filename)
+	if extension == ".json" {
+		err = json.Unmarshal(file, &p)
+	} else if extension == ".yaml" {
+		err = yaml.Unmarshal(file, &p)
+	} else {
+		return nil, errors.New("Pipeline description must be in json or yaml format!")
+	}
+
 	if err != nil {
 		return nil, err
 	}
+
 	err = CheckNames(p)
 	if err != nil {
 		return nil, err
