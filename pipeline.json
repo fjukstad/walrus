@@ -8,6 +8,16 @@
                 "sh", "-c", "ls / > /walrus/stage1/file"
             ]
         }, 
+        { 
+            "Name":"waitstage",
+            "Image": "ubuntu:latest",
+            "Cmd":["sh","-c","sleep 10"]
+        },
+        { 
+            "Name":"waitstage2",
+            "Image": "ubuntu:latest",
+            "Cmd":["sh","-c","sleep 5"]
+        },
         {
             "Name": "stage2",
             "Image": "ubuntu:14.04",

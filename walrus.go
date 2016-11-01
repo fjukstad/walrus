@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -15,54 +16,102 @@ import (
 	"github.com/docker/docker/client"
 )
 
+var stageMutexes []*sync.Mutex
+var completedConditions []*sync.Cond
+var completedStages []bool
+
 func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 	// generate a version number/name if the pipeline description didn't
 	if p.Version == "" {
 		p.Version = createName()
 	}
 
-	for _, stage := range p.Stages {
-		repo, tag := getRepoAndTag(stage.Image)
-		image := repo + ":" + tag
-		_, err := c.ImagePull(context.Background(), image, types.ImagePullOptions{})
-		if err != nil {
-			return err
-		}
+	stageMutexes = make([]*sync.Mutex, len(p.Stages))
+	completedConditions = make([]*sync.Cond, len(p.Stages))
+	completedStages = make([]bool, len(p.Stages))
 
-		mountpath := "/walrus/" + stage.Name
-		hostpath := rootpath + "/" + stage.Name
+	for i := range stageMutexes {
+		stageMutexes[i] = &sync.Mutex{}
+		completedConditions[i] = sync.NewCond(stageMutexes[i])
+	}
 
-		// Note the 0777 permission bits. We use such liberal bits since
-		// we do not know about the users within the docker containers that
-		// are going to be run. We want to fix this later!
-		err = os.MkdirAll(hostpath, 0777)
-		if err != nil {
-			return err
-		}
+	e := make(chan error, len(p.Stages))
 
-		resp, err := c.ContainerCreate(context.Background(),
-			&container.Config{Image: image,
-				Env: stage.Env,
-				Cmd: stage.Cmd,
-			},
-			&container.HostConfig{
-				Binds:       []string{hostpath + ":" + mountpath},
-				VolumesFrom: stage.Inputs},
-			&network.NetworkingConfig{},
-			stage.Name)
+	for i, stage := range p.Stages {
+		go func(i int, stage Stage) {
+			repo, tag := getRepoAndTag(stage.Image)
+			image := repo + ":" + tag
+			_, err := c.ImagePull(context.Background(), image, types.ImagePullOptions{})
+			if err != nil {
+				e <- err
+			}
 
-		if err != nil {
-			return err
-		}
-		containerId := resp.ID
-		err = c.ContainerStart(context.Background(), containerId,
-			types.ContainerStartOptions{})
+			mountpath := "/walrus/" + stage.Name
+			hostpath := rootpath + "/" + stage.Name
 
-		if err != nil {
-			return err
-		}
+			// Note the 0777 permission bits. We use such liberal bits since
+			// we do not know about the users within the docker containers that
+			// are going to be run. We want to fix this later!
+			err = os.MkdirAll(hostpath, 0777)
+			if err != nil {
+				e <- err
+			}
 
-		_, err = c.ContainerWait(context.Background(), containerId)
+			// If the stage has any inputs it waits for these stages to complete
+			// before starting
+			if len(stage.Inputs) > 0 {
+				for j := range stage.Inputs {
+					cond := completedConditions[j]
+					cond.L.Lock()
+					for !completedStages[j] {
+						cond.Wait()
+					}
+					cond.L.Unlock()
+				}
+			}
+
+			resp, err := c.ContainerCreate(context.Background(),
+				&container.Config{Image: image,
+					Env: stage.Env,
+					Cmd: stage.Cmd,
+				},
+				&container.HostConfig{
+					Binds:       []string{hostpath + ":" + mountpath},
+					VolumesFrom: stage.Inputs},
+				&network.NetworkingConfig{},
+				stage.Name)
+
+			if err != nil {
+				e <- err
+			}
+			containerId := resp.ID
+			err = c.ContainerStart(context.Background(), containerId,
+				types.ContainerStartOptions{})
+
+			if err != nil {
+				e <- err
+			}
+
+			_, err = c.ContainerWait(context.Background(), containerId)
+			if err != nil {
+				e <- err
+			}
+
+			cond := completedConditions[i]
+			cond.L.Lock()
+			// Notifies waiting stages on completion
+			completedStages[i] = true
+			cond.Broadcast()
+			cond.L.Unlock()
+
+			fmt.Println("Stage", stage.Name, "completed successfully")
+
+			e <- nil
+		}(i, stage)
+	}
+
+	for i := 0; i < len(p.Stages); i++ {
+		err := <-e
 		if err != nil {
 			return err
 		}
@@ -203,7 +252,6 @@ func main() {
 	var outputDir = flag.String("output", ".", "where walrus should store output data on the host")
 
 	flag.Parse()
-	var mountpath = "/walrus"
 
 	hostpath, err := filepath.Abs(*outputDir)
 	if err != nil {
