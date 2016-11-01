@@ -248,8 +248,7 @@ func createConfigPath(hostpath string) string {
 
 func main() {
 	var configFilename = flag.String("f", "pipeline.json", "pipeline description file")
-	var cmd = flag.String("cmd", "run", "walrus command. available commands: 'run'")
-	var outputDir = flag.String("output", ".", "where walrus should store output data on the host")
+	var outputDir = flag.String("output", "walrus", "where walrus should store output data on the host")
 
 	flag.Parse()
 
@@ -276,10 +275,7 @@ func main() {
 		return
 	}
 
-	switch *cmd {
-	case "run":
-		err = run(client, p, hostpath, *configFilename)
-	}
+	err = run(client, p, hostpath, *configFilename)
 
 	if err != nil {
 		fmt.Println(err)
@@ -287,7 +283,6 @@ func main() {
 	}
 
 	err = saveConfiguration(hostpath, p)
-
 	if err != nil {
 		fmt.Println(err)
 		return

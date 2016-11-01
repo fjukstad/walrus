@@ -23,7 +23,6 @@ type Stage struct {
 	Image       string
 	Cmd         []string
 	Env         []string
-	Stdin       []string
 	Inputs      []string
 	Parallelism Parallelism
 }
