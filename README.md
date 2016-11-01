@@ -5,6 +5,8 @@ JSON or YAML file and starts Docker containers as described in this file. It's
 really nothing more than a fancy shell script to start Docker containers.
 
 
+
+
 ## Pipeline 
 A pipeline has a *name*, a list of *pipeline stages*, a *version*, and a
 *comment*. See below for an example pipeline. 
@@ -48,12 +50,12 @@ Usage of walrus:
   -f string
     	pipeline description file (default "pipeline.json")
   -output string
-    	where walrus should store output data on the host (default ".")
+    	where walrus should store output data on the host (default "walrus")
 ```
 
 # Example pipeline
 Here's a small example pipeline. It consists of two stages: the first writes all
-files in the `/` directory to a file `/walrus/stage1/file`, the second writes
+filenames in the `/` directory to a file `/walrus/stage1/file`, the second writes
 all files with `bin` in the name to a new file `/walrus/stage2/file2`. 
 
 ```
