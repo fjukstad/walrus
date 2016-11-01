@@ -42,7 +42,12 @@ any output data it finds.  These are moved to directories named
 pipeline description. If the version field is not set it generates a version
 name for the pipeline. 
 
-# Usage
+# Installation and usage
+
+- Install [go](http://golang.org). 
+- `go get github.com/fjukstad/walrus`
+- `walrus -f $PIPELINE_DESCRIPTION` where `$PIPELINE_DESCRIPTION` is the
+  filename of a pipeline description you've created.  
 
 ```
 $ walrus --help
