@@ -61,7 +61,7 @@ Usage of walrus:
 # Example pipeline
 Here's a small example pipeline. It consists of two stages: the first writes all
 filenames in the `/` directory to a file `/walrus/stage1/file`, the second writes
-all files with `bin` in the name to a new file `/walrus/stage2/file2`. 
+all filenames with `bin` in the name to a new file `/walrus/stage2/file2`. 
 
 ```
 name: example
