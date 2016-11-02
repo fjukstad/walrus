@@ -12,7 +12,7 @@ import (
 
 type Pipeline struct {
 	Name    string
-	Stages  []Stage
+	Stages  []*Stage
 	Cache   bool
 	Version string
 	Comment string

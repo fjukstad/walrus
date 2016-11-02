@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -38,7 +39,7 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 	e := make(chan error, len(p.Stages))
 
 	for i, stage := range p.Stages {
-		go func(i int, stage Stage) {
+		go func(i int, stage *Stage) {
 			repo, tag := getRepoAndTag(stage.Image)
 			image := repo + ":" + tag
 			_, err := c.ImagePull(context.Background(), image, types.ImagePullOptions{})
@@ -132,7 +133,7 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 }
 
 // Stops any previously run pipeline and deletes the containers.
-func stopPreviousRun(c *client.Client, stages []Stage) {
+func stopPreviousRun(c *client.Client, stages []*Stage) {
 	for _, stage := range stages {
 		c.ContainerStop(context.Background(), stage.Name, nil)
 		c.ContainerRemove(context.Background(), stage.Name, types.ContainerRemoveOptions{})
@@ -249,6 +250,36 @@ func createConfigPath(hostpath string) string {
 	return hostpath + "/" + ".walrus"
 }
 
+func fixMountPaths(stages []*Stage) error {
+	for i, stage := range stages {
+		updatedVolumes := []string{}
+		for _, volume := range stage.Volumes {
+			hostClientPath := strings.Split(volume, ":")
+
+			if len(hostClientPath) > 2 {
+				return errors.New("Incorrect volume " + volume + " in pipeline description")
+			}
+
+			hostPath := hostClientPath[0]
+			clientPath := hostClientPath[1]
+
+			if strings.HasPrefix(hostPath, "/") {
+				updatedVolumes = append(updatedVolumes, volume)
+				continue
+			}
+
+			absPath, err := filepath.Abs(hostPath)
+			if err != nil {
+				return err
+			}
+			updatedVolumes = append(updatedVolumes, absPath+":"+clientPath)
+		}
+		stages[i].Volumes = updatedVolumes
+	}
+
+	return nil
+}
+
 func main() {
 	var configFilename = flag.String("f", "pipeline.json", "pipeline description file")
 	var outputDir = flag.String("output", "walrus", "where walrus should store output data on the host")
@@ -263,12 +294,20 @@ func main() {
 	flag.Parse()
 	client, err := client.NewEnvClient()
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
+		return
 	}
 
 	p, err := ParseConfig(*configFilename)
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
+		return
+	}
+
+	err = fixMountPaths(p.Stages)
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
 
 	stopPreviousRun(client, p.Stages)
