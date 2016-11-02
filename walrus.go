@@ -70,13 +70,16 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 				}
 			}
 
+			binds := []string{hostpath + ":" + mountpath}
+			binds = append(binds, stage.Volumes...)
+
 			resp, err := c.ContainerCreate(context.Background(),
 				&container.Config{Image: image,
 					Env: stage.Env,
 					Cmd: stage.Cmd,
 				},
 				&container.HostConfig{
-					Binds:       []string{hostpath + ":" + mountpath},
+					Binds:       binds,
 					VolumesFrom: stage.Inputs},
 				&network.NetworkingConfig{},
 				stage.Name)

@@ -6,7 +6,8 @@
             "Image": "ubuntu:latest",
             "Cmd": [
                 "sh", "-c", "ls / > /walrus/stage1/file"
-            ]
+            ],
+            "Volumes": ["/tmp/tmpfolder:/tmp"]
         }, 
         { 
             "Name":"waitstage",

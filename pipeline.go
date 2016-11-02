@@ -24,6 +24,7 @@ type Stage struct {
 	Cmd         []string
 	Env         []string
 	Inputs      []string
+	Volumes     []string
 	Parallelism Parallelism
 }
 
