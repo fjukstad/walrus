@@ -2,13 +2,24 @@
     "Name": "fruitstand",
     "Stages": [
         {
+            "Name": "input",
+            "Image": "ubuntu",
+            "Cmd": [
+                "sh", "-c",
+                "cp /data/set1.txt /walrus/input/set1.txt"
+            ],
+            "Volumes": ["data:/data"]
+        }, 
+        {
             "Name": "filter",
             "Image": "ubuntu",
             "Cmd": [
                 "sh", "-c",
-                "for fruit in apple orange banana; do grep $fruit /data/set1.txt | awk '{print $2}' >> /walrus/filter/$fruit; done"
+                "for fruit in apple orange banana; do grep $fruit /input/set1.txt | awk '{print $2}' >> /walrus/filter/$fruit; done"
             ],
-            "Volumes": ["data:/data"]
+            "Inputs" : [
+                "input"
+            ]
         }, 
         {
             "Name": "sum",

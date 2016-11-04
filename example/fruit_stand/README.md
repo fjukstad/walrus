@@ -8,15 +8,18 @@ from  great guys at [Pachyderm](http://pachyderm.io/). Look at
 
 ```
 $ walrus -f pipeline.json
-Stage filter completed successfully
-Stage sum completed successfully
+input completed successfully.
+filter completed successfully.
+sum completed successfully.
+All stages completed successfully. 
+Output written to ...
 ```
 
 # Have a look at the output
 
 ```
 $ ls walrus
-filter  sum
+filter  input   sum
 $ cat walrus/sum/apple
 133
 ```
