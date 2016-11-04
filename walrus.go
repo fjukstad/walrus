@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -15,6 +14,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
+	"github.com/pkg/errors"
 )
 
 var stageMutexes []*sync.Mutex
@@ -44,7 +44,7 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 			image := repo + ":" + tag
 			_, err := c.ImagePull(context.Background(), image, types.ImagePullOptions{})
 			if err != nil {
-				e <- err
+				e <- errors.Wrap(err, "Could not pull image")
 			}
 
 			mountpath := "/walrus/" + stage.Name
@@ -55,7 +55,7 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 			// are going to be run. We want to fix this later!
 			err = os.MkdirAll(hostpath, 0777)
 			if err != nil {
-				e <- err
+				e <- errors.Wrap(err, "Could not create output directory for stage")
 			}
 
 			// If the stage has any inputs it waits for these stages to complete
@@ -86,19 +86,19 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 				stage.Name)
 
 			if err != nil {
-				e <- err
+				e <- errors.Wrap(err, "Could not create container")
 			}
 			containerId := resp.ID
 			err = c.ContainerStart(context.Background(), containerId,
 				types.ContainerStartOptions{})
 
 			if err != nil {
-				e <- err
+				e <- errors.Wrap(err, "Could not start container")
 			}
 
 			_, err = c.ContainerWait(context.Background(), containerId)
 			if err != nil {
-				e <- err
+				e <- errors.Wrap(err, "Failed to wait for container to finish")
 			}
 
 			cond := completedConditions[i]
@@ -169,22 +169,22 @@ func saveConfiguration(hostpath string, p *Pipeline) error {
 	configPath := createConfigPath(hostpath)
 	err := os.Mkdir(configPath, 0777)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Could not create directory to save old pipeline results")
 	}
 
 	filename := configPath + "/" + "pipeline.json"
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Could not open old pipeline configuration")
 	}
 	b, err := json.Marshal(p)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Could not marshal pipeline configuration")
 	}
 
 	_, err = f.Write(b)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Could not write pipeline configuration")
 	}
 
 	return nil
@@ -203,16 +203,15 @@ func savePreviousRun(hostpath string) error {
 			return nil
 		}
 
-		return err
+		return errors.Wrap(err, "Could not open previous pipeline outputs")
 	}
 	files, err := f.Readdir(-1)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Could not read output directory")
 	}
 
-	// No files in output directory, nothing to back up
 	if len(files) == 0 {
-		return nil
+		return errors.Wrap(err, "No files in output directory, nothing to back up")
 	}
 
 	// Read old pipeline description to get it's version (use it for renaming)
@@ -220,12 +219,12 @@ func savePreviousRun(hostpath string) error {
 	configFilename := configPath + "/" + "pipeline.json"
 	p, err := ParseConfig(configFilename)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Could not parse old pipeline configuration")
 	}
 
 	absPath, err := filepath.Abs(hostpath)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Could not get the absolute path of the output directory")
 	}
 
 	for _, file := range files {
@@ -237,7 +236,7 @@ func savePreviousRun(hostpath string) error {
 				newFile := absPath + "/" + file.Name() + "-" + p.Version
 				err = os.Rename(oldFile, newFile)
 				if err != nil {
-					return err
+					return errors.Wrap(err, "Could not rename stage output directory")
 				}
 			}
 		}
@@ -270,7 +269,7 @@ func fixMountPaths(stages []*Stage) error {
 
 			absPath, err := filepath.Abs(hostPath)
 			if err != nil {
-				return err
+				return errors.Wrap(err, "Could not get the absolute path of the mount path")
 			}
 			updatedVolumes = append(updatedVolumes, absPath+":"+clientPath)
 		}
