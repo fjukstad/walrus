@@ -117,7 +117,7 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 			cond.Broadcast()
 			cond.L.Unlock()
 
-			fmt.Println("Stage", stage.Name, "completed successfully.")
+			fmt.Println(stage.Name, "completed successfully.")
 
 			e <- nil
 		}(i, stage)
@@ -340,7 +340,8 @@ func main() {
 		fmt.Println(err)
 		return
 	} else {
-		fmt.Println("Pipeline done. Have a look in ", hostpath, "for your results")
+		fmt.Println("All stages completed successfully.",
+			"\nOutput written to ", hostpath)
 	}
 
 }
