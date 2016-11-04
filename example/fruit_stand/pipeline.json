@@ -6,7 +6,7 @@
             "Image": "ubuntu",
             "Cmd": [
                 "sh", "-c",
-                "cp /data/set1.txt /walrus/input/set1.txt"
+                "cp /data/* /walrus/input/"
             ],
             "Volumes": ["data:/data"]
         }, 
