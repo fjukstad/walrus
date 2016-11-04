@@ -20,6 +20,7 @@ import (
 var stageMutexes []*sync.Mutex
 var completedConditions []*sync.Cond
 var completedStages []bool
+var stageIndex map[string]int
 
 func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 	// generate a version number/name if the pipeline description didn't
@@ -34,6 +35,13 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 	for i := range stageMutexes {
 		stageMutexes[i] = &sync.Mutex{}
 		completedConditions[i] = sync.NewCond(stageMutexes[i])
+	}
+
+	stageIndex = make(map[string]int, len(p.Stages))
+
+	// Name to index mapping
+	for i, stage := range p.Stages {
+		stageIndex[stage.Name] = i
 	}
 
 	e := make(chan error, len(p.Stages))
@@ -61,10 +69,11 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 			// If the stage has any inputs it waits for these stages to complete
 			// before starting
 			if len(stage.Inputs) > 0 {
-				for j := range stage.Inputs {
-					cond := completedConditions[j]
+				for _, input := range stage.Inputs {
+					index := stageIndex[input]
+					cond := completedConditions[index]
 					cond.L.Lock()
-					for !completedStages[j] {
+					for !completedStages[index] {
 						cond.Wait()
 					}
 					cond.L.Unlock()
@@ -86,7 +95,7 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 				stage.Name)
 
 			if err != nil {
-				e <- errors.Wrap(err, "Could not create container")
+				e <- errors.Wrap(err, "Could not create container "+stage.Name)
 			}
 			containerId := resp.ID
 			err = c.ContainerStart(context.Background(), containerId,
@@ -108,7 +117,7 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 			cond.Broadcast()
 			cond.L.Unlock()
 
-			fmt.Println("Stage", stage.Name, "completed successfully")
+			fmt.Println("Stage", stage.Name, "completed successfully.")
 
 			e <- nil
 		}(i, stage)
@@ -132,10 +141,11 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 	return nil
 }
 
-// Stops any previously run pipeline and deletes the containers.
+// Stops any previously run pipeline and deletes the containers. If any, we
+// ignore errors from docker.
 func stopPreviousRun(c *client.Client, stages []*Stage) {
 	for _, stage := range stages {
-		c.ContainerStop(context.Background(), stage.Name, nil)
+		c.ContainerKill(context.Background(), stage.Name, "9")
 		c.ContainerRemove(context.Background(), stage.Name, types.ContainerRemoveOptions{})
 	}
 }
@@ -146,7 +156,6 @@ func getInputVolumes(inputs []string, hostpath string) (volumes []string) {
 	for _, input := range inputs {
 		volumes = append(volumes, hostpath+"/"+input+":"+"/walrus"+"/"+input)
 	}
-	fmt.Println("VOLUMES", volumes)
 	return volumes
 }
 
@@ -219,6 +228,9 @@ func savePreviousRun(hostpath string) error {
 	configFilename := configPath + "/" + "pipeline.json"
 	p, err := ParseConfig(configFilename)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return errors.Wrap(err, "Could not parse old pipeline configuration")
 	}
 
