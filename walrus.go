@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -54,10 +55,18 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 
 			repo, tag := getRepoAndTag(stage.Image)
 			image := repo + ":" + tag
-			_, err := c.ImagePull(context.Background(), image, types.ImagePullOptions{})
+			rc, err := c.ImagePull(context.Background(), image,
+				types.ImagePullOptions{})
 			if err != nil {
 				e <- errors.Wrap(err, "Could not pull image")
 				return
+			}
+
+			defer rc.Close()
+
+			_, err = ioutil.ReadAll(rc)
+			if err != nil {
+				e <- errors.Wrap(err, "error reading image pull")
 			}
 
 			// If the stage has any inputs it waits for these stages to complete
