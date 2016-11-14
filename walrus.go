@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,22 +49,15 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 
 	for i, stage := range p.Stages {
 		go func(i int, stage *Stage) {
+			mountpath := "/walrus/" + stage.Name
+			hostpath := rootpath + "/" + stage.Name
+
 			repo, tag := getRepoAndTag(stage.Image)
 			image := repo + ":" + tag
 			_, err := c.ImagePull(context.Background(), image, types.ImagePullOptions{})
 			if err != nil {
 				e <- errors.Wrap(err, "Could not pull image")
-			}
-
-			mountpath := "/walrus/" + stage.Name
-			hostpath := rootpath + "/" + stage.Name
-
-			// Note the 0777 permission bits. We use such liberal bits since
-			// we do not know about the users within the docker containers that
-			// are going to be run. We want to fix this later!
-			err = os.MkdirAll(hostpath, 0777)
-			if err != nil {
-				e <- errors.Wrap(err, "Could not create output directory for stage")
+				return
 			}
 
 			// If the stage has any inputs it waits for these stages to complete
@@ -80,40 +74,67 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 				}
 			}
 
-			binds := []string{hostpath + ":" + mountpath}
-			binds = append(binds, stage.Volumes...)
+			// try to open output directory, if it exists then we can serve the
+			// "cached"/old results
+			_, err = os.Open(hostpath)
 
-			resp, err := c.ContainerCreate(context.Background(),
-				&container.Config{Image: image,
-					Env: stage.Env,
-					Cmd: stage.Cmd,
-				},
-				&container.HostConfig{
-					Binds:       binds,
-					VolumesFrom: stage.Inputs},
-				&network.NetworkingConfig{},
-				stage.Name)
+			if !stage.Cache || err != nil {
 
-			if err != nil {
-				e <- errors.Wrap(err, "Could not create container "+stage.Name)
-			}
-			containerId := resp.ID
-			err = c.ContainerStart(context.Background(), containerId,
-				types.ContainerStartOptions{})
+				// first remove any previous container (note that we're ignoring
+				// errors)
+				c.ContainerRemove(context.Background(), stage.Name, types.ContainerRemoveOptions{})
 
-			if err != nil {
-				e <- errors.Wrap(err, "Could not start container")
-			}
+				// Note the 0777 permission bits. We use such liberal bits since
+				// we do not know about the users within the docker containers that
+				// are going to be run. We want to fix this later!
+				err = os.MkdirAll(hostpath, 0777)
+				if err != nil {
+					e <- errors.Wrap(err, "Could not create output directory for stage")
+					return
+				}
 
-			_, err = c.ContainerWait(context.Background(), containerId)
-			if err != nil {
-				e <- errors.Wrap(err, "Failed to wait for container to finish")
+				binds := []string{hostpath + ":" + mountpath}
+				binds = append(binds, stage.Volumes...)
+
+				resp, err := c.ContainerCreate(context.Background(),
+					&container.Config{Image: image,
+						Env: stage.Env,
+						Cmd: stage.Cmd,
+					},
+					&container.HostConfig{
+						Binds:       binds,
+						VolumesFrom: stage.Inputs},
+					&network.NetworkingConfig{},
+					stage.Name)
+
+				if err != nil {
+					e <- errors.Wrap(err, "Could not create container "+stage.Name)
+					return
+				}
+				containerId := resp.ID
+
+				err = c.ContainerStart(context.Background(), containerId,
+					types.ContainerStartOptions{})
+
+				if err != nil {
+					e <- errors.Wrap(err, "Could not start container")
+					return
+				}
+
+				_, err = c.ContainerWait(context.Background(), containerId)
+				if err != nil {
+					e <- errors.Wrap(err, "Failed to wait for container to finish")
+					return
+				}
+
 			}
 
 			cond := completedConditions[i]
 			cond.L.Lock()
+
 			// Notifies waiting stages on completion
 			completedStages[i] = true
+
 			cond.Broadcast()
 			cond.L.Unlock()
 
@@ -146,7 +167,6 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 func stopPreviousRun(c *client.Client, stages []*Stage) {
 	for _, stage := range stages {
 		c.ContainerKill(context.Background(), stage.Name, "9")
-		c.ContainerRemove(context.Background(), stage.Name, types.ContainerRemoveOptions{})
 	}
 }
 
@@ -239,21 +259,69 @@ func savePreviousRun(hostpath string) error {
 		return errors.Wrap(err, "Could not get the absolute path of the output directory")
 	}
 
-	for _, file := range files {
-		if file.IsDir() {
-			// Checks if directory name is a single word, i.e. a stage name that
-			// has not yet been 'backed up' yet.
-			if len(strings.Split(file.Name(), "-")) == 1 {
-				oldFile := absPath + "/" + file.Name()
-				newFile := absPath + "/" + file.Name() + "-" + p.Version
-				err = os.Rename(oldFile, newFile)
-				if err != nil {
-					return errors.Wrap(err, "Could not rename stage output directory")
-				}
-			}
+	// iterate over all stages and move each output folder to a new directory
+	// if the stage is cached the directory is copied. .
+	for _, stage := range p.Stages {
+		newFilename := absPath + "/" + stage.Name + "-" + p.Version
+		oldFilename := absPath + "/" + stage.Name
+
+		if stage.Cache {
+			err = copyDir(oldFilename, newFilename)
+		} else {
+			err = os.Rename(oldFilename, newFilename)
+		}
+		if err != nil {
+			return errors.Wrap(err, "Could not back up pipeline stage directory")
 		}
 	}
+
+	// back up the walrus directory as well
+	walrusDirectory := configPath
+	newWalrusDirectory := walrusDirectory + "-" + p.Version
+	err = os.Rename(walrusDirectory, newWalrusDirectory)
+	if err != nil {
+		return err
+	}
+
 	return nil
+}
+
+// Copies one directory to another. NOTE, only one level, not recursive yet.
+func copyDir(src, dest string) error {
+
+	err := os.Mkdir(dest, 0777)
+	if err != nil {
+		return err
+	}
+	err = filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		// nothing to back up
+		if err != nil {
+			return err
+		}
+
+		// if dir then create dir , else a file then copy it
+		if info.IsDir() {
+		} else {
+			srcFile, err := os.Open(path)
+			if err != nil {
+				return err
+			}
+
+			destFilename := dest + "/" + info.Name()
+			destFile, err := os.OpenFile(destFilename, os.O_CREATE, 0644)
+			if err != nil {
+				return err
+			}
+
+			_, err = io.Copy(srcFile, destFile)
+			if err != nil {
+				return err
+			}
+
+		}
+		return nil
+	})
+	return err
 }
 
 // Returns the full path of the  walrus configuration directory

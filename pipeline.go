@@ -13,7 +13,6 @@ import (
 type Pipeline struct {
 	Name    string
 	Stages  []*Stage
-	Cache   bool
 	Version string
 	Comment string
 }
@@ -26,6 +25,7 @@ type Stage struct {
 	Inputs      []string
 	Volumes     []string
 	Parallelism Parallelism
+	Cache       bool
 }
 
 type Parallelism struct {

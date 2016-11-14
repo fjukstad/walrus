@@ -8,14 +8,15 @@
                 "sh", "-c",
                 "cp /data/* /walrus/input/"
             ],
-            "Volumes": ["data:/data"]
+            "Volumes": ["data:/data"],
+            "Cache": true
         }, 
         {
             "Name": "filter",
             "Image": "ubuntu",
             "Cmd": [
                 "sh", "-c",
-                "for fruit in apple orange banana; do grep $fruit /input/set1.txt | awk '{print $2}' >> /walrus/filter/$fruit; done"
+                "for fruit in apple orange banana; do grep $fruit /walrus/input/set1.txt | awk '{print $2}' >> /walrus/filter/$fruit; done"
             ],
             "Inputs" : [
                 "input"
@@ -33,7 +34,6 @@
             ]
         }
     ],
-    "Cache": false,
     "Version": "",
     "Comment": "Fruit stand example pipeline from Pachyderm"
 }
