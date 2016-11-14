@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -317,7 +318,7 @@ func copyDir(src, dest string) error {
 			}
 
 			destFilename := dest + "/" + info.Name()
-			destFile, err := os.OpenFile(destFilename, os.O_CREATE, 0644)
+			destFile, err := os.OpenFile(destFilename, os.O_CREATE, 0664)
 			if err != nil {
 				return err
 			}
@@ -349,7 +350,13 @@ func fixMountPaths(stages []*Stage) error {
 			}
 
 			hostPath := hostClientPath[0]
-			clientPath := hostClientPath[1]
+
+			var clientPath string
+			if len(hostClientPath) < 2 {
+				clientPath = hostPath
+			} else {
+				clientPath = hostClientPath[1]
+			}
 
 			if strings.HasPrefix(hostPath, "/") {
 				updatedVolumes = append(updatedVolumes, volume)
@@ -360,7 +367,13 @@ func fixMountPaths(stages []*Stage) error {
 			if err != nil {
 				return errors.Wrap(err, "Could not get the absolute path of the mount path")
 			}
-			updatedVolumes = append(updatedVolumes, absPath+":"+clientPath)
+
+			mount := absPath + ":" + clientPath
+			if stage.MountPropagation != "" {
+				mount = mount + ":" + stage.MountPropagation
+			}
+
+			updatedVolumes = append(updatedVolumes, mount)
 		}
 		stages[i].Volumes = updatedVolumes
 	}
@@ -374,9 +387,15 @@ func main() {
 
 	flag.Parse()
 
+	// set umask to 000 while walrus is running (we want to have full read/write
+	// permissions to the output dirs while running.
+	oldmask := syscall.Umask(000)
+	defer syscall.Umask(oldmask)
+
 	hostpath, err := filepath.Abs(*outputDir)
 	if err != nil {
 		fmt.Println("Check hostpath", err)
+		return
 	}
 
 	flag.Parse()
