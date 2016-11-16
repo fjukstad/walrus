@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -148,6 +149,20 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 			cond.Broadcast()
 			cond.L.Unlock()
 
+			exitCode, err := exitCode(c, stage.Name)
+			if err != nil {
+				e <- err
+			}
+
+			if exitCode != 0 {
+				logs, err := getLogs(c, stage.Name)
+				if err != nil {
+					e <- err
+					return
+				}
+				e <- errors.New(stage.Name + " failed\n" + logs)
+				return
+			}
 			fmt.Println(stage.Name, "completed successfully.")
 
 			e <- nil
@@ -170,6 +185,35 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 	// }
 
 	return nil
+}
+
+func exitCode(c *client.Client, container string) (int, error) {
+	info, err := c.ContainerInspect(context.Background(), container)
+	if err != nil {
+		return 1, err
+	}
+	state := info.State
+	return state.ExitCode, nil
+}
+
+func getLogs(c *client.Client, container string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	client, _ := client.NewEnvClient()
+	reader, err := client.ContainerLogs(ctx, container, types.ContainerLogsOptions{
+		ShowStderr: true,
+		ShowStdout: true,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	b, err := ioutil.ReadAll(reader)
+	if err != nil && err != io.EOF {
+		return "", err
+	}
+	return string(b), nil
 }
 
 // Stops any previously run pipeline and deletes the containers. If any, we
@@ -418,6 +462,7 @@ func main() {
 	}
 
 	stopPreviousRun(client, p.Stages)
+
 	err = savePreviousRun(hostpath)
 	if err != nil {
 		fmt.Println(err)
