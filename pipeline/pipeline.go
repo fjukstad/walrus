@@ -18,15 +18,16 @@ type Pipeline struct {
 }
 
 type Stage struct {
-	Name        string
-	Image       string
-	Cmd         []string
-	Env         []string
-	Inputs      []string
-	Volumes     []string
-	Parallelism Parallelism
-	Cache       bool
-	Comment     string
+	Name             string
+	Image            string
+	Cmd              []string
+	Env              []string
+	Inputs           []string
+	Volumes          []string
+	Parallelism      Parallelism
+	Cache            bool
+	Comment          string
+	MountPropagation string
 }
 
 type Parallelism struct {

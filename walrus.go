@@ -6,10 +6,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/fjukstad/walrus/pipeline"
 
@@ -56,10 +58,18 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 
 			repo, tag := getRepoAndTag(stage.Image)
 			image := repo + ":" + tag
-			_, err := c.ImagePull(context.Background(), image, types.ImagePullOptions{})
+			rc, err := c.ImagePull(context.Background(), image,
+				types.ImagePullOptions{})
 			if err != nil {
 				e <- errors.Wrap(err, "Could not pull image")
 				return
+			}
+
+			defer rc.Close()
+
+			_, err = ioutil.ReadAll(rc)
+			if err != nil {
+				e <- errors.Wrap(err, "error reading image pull")
 			}
 
 			// If the stage has any inputs it waits for these stages to complete
@@ -310,7 +320,7 @@ func copyDir(src, dest string) error {
 			}
 
 			destFilename := dest + "/" + info.Name()
-			destFile, err := os.OpenFile(destFilename, os.O_CREATE, 0644)
+			destFile, err := os.OpenFile(destFilename, os.O_CREATE, 0664)
 			if err != nil {
 				return err
 			}
@@ -342,7 +352,13 @@ func fixMountPaths(stages []*pipeline.Stage) error {
 			}
 
 			hostPath := hostClientPath[0]
-			clientPath := hostClientPath[1]
+
+			var clientPath string
+			if len(hostClientPath) < 2 {
+				clientPath = hostPath
+			} else {
+				clientPath = hostClientPath[1]
+			}
 
 			if strings.HasPrefix(hostPath, "/") {
 				updatedVolumes = append(updatedVolumes, volume)
@@ -353,7 +369,13 @@ func fixMountPaths(stages []*pipeline.Stage) error {
 			if err != nil {
 				return errors.Wrap(err, "Could not get the absolute path of the mount path")
 			}
-			updatedVolumes = append(updatedVolumes, absPath+":"+clientPath)
+
+			mount := absPath + ":" + clientPath
+			if stage.MountPropagation != "" {
+				mount = mount + ":" + stage.MountPropagation
+			}
+
+			updatedVolumes = append(updatedVolumes, mount)
 		}
 		stages[i].Volumes = updatedVolumes
 	}
@@ -367,9 +389,15 @@ func main() {
 
 	flag.Parse()
 
+	// set umask to 000 while walrus is running (we want to have full read/write
+	// permissions to the output dirs while running.
+	oldmask := syscall.Umask(000)
+	defer syscall.Umask(oldmask)
+
 	hostpath, err := filepath.Abs(*outputDir)
 	if err != nil {
 		fmt.Println("Check hostpath", err)
+		return
 	}
 
 	flag.Parse()
