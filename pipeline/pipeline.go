@@ -1,4 +1,4 @@
-package main
+package pipeline
 
 import (
 	"encoding/json"
@@ -27,6 +27,7 @@ type Stage struct {
 	Volumes          []string
 	Parallelism      Parallelism
 	Cache            bool
+	Comment          string
 	MountPropagation string
 }
 
