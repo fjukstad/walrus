@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/fjukstad/walrus/pipeline"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
@@ -23,7 +25,7 @@ var completedConditions []*sync.Cond
 var completedStages []bool
 var stageIndex map[string]int
 
-func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
+func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) error {
 	// generate a version number/name if the pipeline description didn't
 	if p.Version == "" {
 		p.Version = createName()
@@ -48,7 +50,7 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 	e := make(chan error, len(p.Stages))
 
 	for i, stage := range p.Stages {
-		go func(i int, stage *Stage) {
+		go func(i int, stage *pipeline.Stage) {
 			mountpath := "/walrus/" + stage.Name
 			hostpath := rootpath + "/" + stage.Name
 
@@ -164,7 +166,7 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 
 // Stops any previously run pipeline and deletes the containers. If any, we
 // ignore errors from docker.
-func stopPreviousRun(c *client.Client, stages []*Stage) {
+func stopPreviousRun(c *client.Client, stages []*pipeline.Stage) {
 	for _, stage := range stages {
 		c.ContainerKill(context.Background(), stage.Name, "9")
 	}
@@ -194,7 +196,7 @@ func getRepoAndTag(pipelineImage string) (repo, tag string) {
 // Saves the pipeline configuration (json) to a new .walrus directory in the
 // output directory specified by the user. Can be used to determine what
 // produced the output in the output directory.
-func saveConfiguration(hostpath string, p *Pipeline) error {
+func saveConfiguration(hostpath string, p *pipeline.Pipeline) error {
 	configPath := createConfigPath(hostpath)
 	err := os.Mkdir(configPath, 0777)
 	if err != nil {
@@ -246,7 +248,7 @@ func savePreviousRun(hostpath string) error {
 	// Read old pipeline description to get it's version (use it for renaming)
 	configPath := createConfigPath(hostpath)
 	configFilename := configPath + "/" + "pipeline.json"
-	p, err := ParseConfig(configFilename)
+	p, err := pipeline.ParseConfig(configFilename)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -329,7 +331,7 @@ func createConfigPath(hostpath string) string {
 	return hostpath + "/" + ".walrus"
 }
 
-func fixMountPaths(stages []*Stage) error {
+func fixMountPaths(stages []*pipeline.Stage) error {
 	for i, stage := range stages {
 		updatedVolumes := []string{}
 		for _, volume := range stage.Volumes {
@@ -377,7 +379,7 @@ func main() {
 		return
 	}
 
-	p, err := ParseConfig(*configFilename)
+	p, err := pipeline.ParseConfig(*configFilename)
 	if err != nil {
 		fmt.Println(err)
 		return
