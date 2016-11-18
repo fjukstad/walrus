@@ -20,6 +20,7 @@ type Pipeline struct {
 type Stage struct {
 	Name             string
 	Image            string
+	Entrypoint       []string
 	Cmd              []string
 	Env              []string
 	Inputs           []string
