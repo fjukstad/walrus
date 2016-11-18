@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -109,8 +110,9 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 
 				resp, err := c.ContainerCreate(context.Background(),
 					&container.Config{Image: image,
-						Env: stage.Env,
-						Cmd: stage.Cmd,
+						Env:        stage.Env,
+						Cmd:        stage.Cmd,
+						Entrypoint: stage.Entrypoint,
 					},
 					&container.HostConfig{
 						Binds:       binds,
@@ -128,7 +130,7 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 					types.ContainerStartOptions{})
 
 				if err != nil {
-					e <- errors.Wrap(err, "Could not start container")
+					e <- errors.Wrap(err, "Could not start container "+stage.Name)
 					return
 				}
 
@@ -149,7 +151,7 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 			cond.Broadcast()
 			cond.L.Unlock()
 
-			exitCode, err := exitCode(c, stage.Name)
+			exitCode, errmsg, err := exitCode(c, stage.Name)
 			if err != nil {
 				e <- err
 			}
@@ -160,7 +162,7 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 					e <- err
 					return
 				}
-				e <- errors.New(stage.Name + " failed\n" + logs)
+				e <- errors.New(stage.Name + " failed with exit code " + strconv.Itoa(exitCode) + "\n" + errmsg + "\n" + logs)
 				return
 			}
 			fmt.Println(stage.Name, "completed successfully.")
@@ -168,11 +170,11 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 			e <- nil
 		}(i, stage)
 	}
-
+	var err error
 	for i := 0; i < len(p.Stages); i++ {
-		err := <-e
+		err = <-e
 		if err != nil {
-			return err
+			fmt.Println(err)
 		}
 	}
 
@@ -184,16 +186,16 @@ func run(c *client.Client, p *Pipeline, rootpath, filename string) error {
 	// 	return err
 	// }
 
-	return nil
+	return err
 }
 
-func exitCode(c *client.Client, container string) (int, error) {
+func exitCode(c *client.Client, container string) (int, string, error) {
 	info, err := c.ContainerInspect(context.Background(), container)
 	if err != nil {
-		return 1, err
+		return 1, "", err
 	}
 	state := info.State
-	return state.ExitCode, nil
+	return state.ExitCode, state.Error, nil
 }
 
 func getLogs(c *client.Client, container string) (string, error) {
@@ -466,7 +468,6 @@ func main() {
 	err = savePreviousRun(hostpath)
 	if err != nil {
 		fmt.Println(err)
-		return
 	}
 
 	err = run(client, p, hostpath, *configFilename)
