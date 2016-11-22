@@ -27,7 +27,7 @@
             "Image": "ubuntu",
             "Cmd": [
                 "sh", "-c",
-                "for fruit in apple orange banana; do { cat /walrus/filter/$fruit || echo 0; cat /walrus/$fruit; } | awk '{s+=$1} END {print s}' > /walrus/sum/$fruit; done"
+                "for fruit in apple orange banana; do { cat /walrus/filter/$fruit || echo 0; cat /walrus/filter/$fruit; } | awk '{s+=$1} END {print s}' > /walrus/sum/$fruit; done"
             ],
             "Inputs" : [
                 "filter"
