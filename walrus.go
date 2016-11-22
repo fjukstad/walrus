@@ -444,6 +444,8 @@ func fixMountPaths(stages []*pipeline.Stage) error {
 func main() {
 	var configFilename = flag.String("f", "pipeline.json", "pipeline description file")
 	var outputDir = flag.String("output", "walrus", "where walrus should store output data on the host")
+	var web = flag.Bool("web", false, "host interactive visualization of the pipeline")
+	var port = flag.String("port", ":9090", "port to run web server for pipeline visualization")
 
 	flag.Parse()
 
@@ -482,6 +484,15 @@ func main() {
 	err = savePreviousRun(hostpath)
 	if err != nil {
 		fmt.Println(err)
+	}
+
+	if *web {
+		go func() {
+			err = startPipelineVisualization(p, *port)
+			if err != nil {
+				fmt.Println("Could not start pipeline visualization:", err)
+			}
+		}()
 	}
 
 	err = run(client, p, hostpath, *configFilename)
