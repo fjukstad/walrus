@@ -158,12 +158,19 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 				e <- err
 			}
 
+			logs, err := getLogs(c, stage.Name)
+			if err != nil {
+				e <- err
+				return
+			}
+
+			err = writeLogs(logs, hostpath)
+			if err != nil {
+				e <- err
+				return
+			}
+
 			if exitCode != 0 {
-				logs, err := getLogs(c, stage.Name)
-				if err != nil {
-					e <- err
-					return
-				}
 				e <- errors.New(stage.Name + " failed with exit code " + strconv.Itoa(exitCode) + "\n" + errmsg + "\n" + logs)
 				return
 			}
@@ -189,6 +196,11 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 	// }
 
 	return err
+}
+
+func writeLogs(logs, path string) error {
+	filename := path + "/walrus.log"
+	return ioutil.WriteFile(filename, []byte(logs), 06444)
 }
 
 func exitCode(c *client.Client, container string) (int, string, error) {
