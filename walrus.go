@@ -93,21 +93,6 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 			_, err = os.Open(hostpath)
 
 			if !stage.Cache || err != nil {
-
-				fmt.Println("Removing container", stage.Name)
-				// first remove any previous container
-				err = c.ContainerRemove(context.Background(), stage.Name,
-					types.ContainerRemoveOptions{RemoveVolumes: true,
-						RemoveLinks: true,
-						Force:       true})
-
-				if err != nil {
-					if !strings.Contains(err.Error(), "No such container") {
-						e <- errors.Wrap(err, "Could not remove container "+stage.Name)
-						return
-					}
-				}
-
 				// Note the 0777 permission bits. We use such liberal bits since
 				// we do not know about the users within the docker containers that
 				// are going to be run. We want to fix this later!
@@ -165,7 +150,7 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 
 			exitCode, errmsg, err := exitCode(c, stage.Name)
 			if err != nil {
-				e <- err
+				e <- errors.Wrap(err, "Could not get exit code for stage"+stage.Name)
 			}
 
 			logs, err := getLogs(c, stage.Name)
@@ -176,7 +161,7 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 
 			err = writeLogs(logs, hostpath)
 			if err != nil {
-				e <- err
+				e <- errors.Wrap(err, "Could not write logs for stage "+stage.Name)
 				return
 			}
 
@@ -242,12 +227,26 @@ func getLogs(c *client.Client, container string) (string, error) {
 	return string(b), nil
 }
 
-// Stops any previously run pipeline and deletes the containers. If any, we
-// ignore errors from docker.
-func stopPreviousRun(c *client.Client, stages []*pipeline.Stage) {
+// Stops any previously run pipeline and deletes the containers.
+func stopPreviousRun(c *client.Client, stages []*pipeline.Stage) error {
 	for _, stage := range stages {
-		c.ContainerKill(context.Background(), stage.Name, "9")
+		err := c.ContainerKill(context.Background(), stage.Name, "9")
+		if err != nil {
+			if !strings.Contains(err.Error(), "No such") &&
+				!strings.Contains(err.Error(), "not running") {
+				return errors.Wrap(err, "Could not kill container "+stage.Name)
+			}
+		}
+		err = c.ContainerRemove(context.Background(), stage.Name,
+			types.ContainerRemoveOptions{RemoveVolumes: true,
+				Force: true})
+		if err != nil {
+			if !strings.Contains(err.Error(), "No such") {
+				return errors.Wrap(err, "Could not remove container "+stage.Name)
+			}
+		}
 	}
+	return nil
 }
 
 // Generate a list of volume mounts on the form
@@ -489,7 +488,11 @@ func main() {
 		return
 	}
 
-	stopPreviousRun(client, p.Stages)
+	err = stopPreviousRun(client, p.Stages)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	err = savePreviousRun(hostpath)
 	if err != nil {
