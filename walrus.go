@@ -168,12 +168,19 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 				e <- err
 			}
 
+			logs, err := getLogs(c, stage.Name)
+			if err != nil {
+				e <- err
+				return
+			}
+
+			err = writeLogs(logs, hostpath)
+			if err != nil {
+				e <- err
+				return
+			}
+
 			if exitCode != 0 {
-				logs, err := getLogs(c, stage.Name)
-				if err != nil {
-					e <- err
-					return
-				}
 				e <- errors.New(stage.Name + " failed with exit code " + strconv.Itoa(exitCode) + "\n" + errmsg + "\n" + logs)
 				return
 			}
@@ -199,6 +206,11 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 	// }
 
 	return err
+}
+
+func writeLogs(logs, path string) error {
+	filename := path + "/walrus.log"
+	return ioutil.WriteFile(filename, []byte(logs), 06444)
 }
 
 func exitCode(c *client.Client, container string) (int, string, error) {
@@ -442,6 +454,8 @@ func fixMountPaths(stages []*pipeline.Stage) error {
 func main() {
 	var configFilename = flag.String("f", "pipeline.json", "pipeline description file")
 	var outputDir = flag.String("output", "walrus", "where walrus should store output data on the host")
+	var web = flag.Bool("web", false, "host interactive visualization of the pipeline")
+	var port = flag.String("port", ":9090", "port to run web server for pipeline visualization")
 
 	flag.Parse()
 
@@ -480,6 +494,15 @@ func main() {
 	err = savePreviousRun(hostpath)
 	if err != nil {
 		fmt.Println(err)
+	}
+
+	if *web {
+		go func() {
+			err = startPipelineVisualization(p, *port)
+			if err != nil {
+				fmt.Println("Could not start pipeline visualization:", err)
+			}
+		}()
 	}
 
 	err = run(client, p, hostpath, *configFilename)
