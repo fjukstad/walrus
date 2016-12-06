@@ -94,9 +94,19 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 
 			if !stage.Cache || err != nil {
 
-				// first remove any previous container (note that we're ignoring
-				// errors)
-				c.ContainerRemove(context.Background(), stage.Name, types.ContainerRemoveOptions{})
+				fmt.Println("Removing container", stage.Name)
+				// first remove any previous container
+				err = c.ContainerRemove(context.Background(), stage.Name,
+					types.ContainerRemoveOptions{RemoveVolumes: true,
+						RemoveLinks: true,
+						Force:       true})
+
+				if err != nil {
+					if !strings.Contains(err.Error(), "No such container") {
+						e <- errors.Wrap(err, "Could not remove container "+stage.Name)
+						return
+					}
+				}
 
 				// Note the 0777 permission bits. We use such liberal bits since
 				// we do not know about the users within the docker containers that
