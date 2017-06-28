@@ -88,14 +88,34 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 				}
 			}
 
+			// If the stage can be cached, check for a previous run. If this
+			// container does not exist we need to run the stage again!
+			if stage.Cache {
+				_, _, err = exitCode(c, stage.Name)
+				if err != nil {
+					fmt.Println(err)
+					fmt.Println("Warning: Could not find cached container", stage.Name, "will re-run the stage")
+					stage.Cache = false
+				}
+			}
+
 			// try to open output directory, if it exists then we can serve the
 			// "cached"/old results
 			_, err = os.Open(hostpath)
 
 			if !stage.Cache || err != nil {
+				// Removes a container with the same name as the stage.
+				// This container could have been a previous run that the user
+				// does not wish to cache, or a cached container which output
+				// directory has been deleted. We ignore any error message
+				// thrown9.
+				c.ContainerRemove(context.Background(), stage.Name,
+					types.ContainerRemoveOptions{RemoveVolumes: true,
+						Force: true})
+
 				// Note the 0777 permission bits. We use such liberal bits since
-				// we do not know about the users within the docker containers that
-				// are going to be run. We want to fix this later!
+				// we do not know about the users within the docker containers
+				// that are going to be run. We want to fix this later!
 				err = os.MkdirAll(hostpath, 0777)
 				if err != nil {
 					e <- errors.Wrap(err, "Could not create output directory for stage")
@@ -117,7 +137,7 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 					&network.NetworkingConfig{},
 					stage.Name)
 
-				if err != nil {
+				if err != nil || resp.ID == " " {
 					e <- errors.Wrap(err, "Could not create container "+stage.Name)
 					return
 				}
@@ -150,7 +170,7 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 
 			exitCode, errmsg, err := exitCode(c, stage.Name)
 			if err != nil {
-				e <- errors.Wrap(err, "Could not get exit code for stage"+stage.Name)
+				e <- errors.Wrap(err, "Could not get exit code for stage "+stage.Name)
 			}
 
 			logs, err := getLogs(c, stage.Name)
@@ -195,13 +215,13 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 
 func writeLogs(logs, path string) error {
 	filename := path + "/walrus.log"
-	return ioutil.WriteFile(filename, []byte(logs), 06444)
+	return ioutil.WriteFile(filename, []byte(logs), 0777)
 }
 
 func exitCode(c *client.Client, container string) (int, string, error) {
 	info, err := c.ContainerInspect(context.Background(), container)
 	if err != nil {
-		return 1, "", err
+		return 0, "", err
 	}
 	state := info.State
 	return state.ExitCode, state.Error, nil
@@ -228,6 +248,8 @@ func getLogs(c *client.Client, container string) (string, error) {
 }
 
 // Stops any previously run pipeline and deletes the containers.
+// Todo investigate if the docker pkg has defined some errors so that we don't
+// have to do any string comparisons (ugly af).
 func stopPreviousRun(c *client.Client, stages []*pipeline.Stage) error {
 	for _, stage := range stages {
 		err := c.ContainerKill(context.Background(), stage.Name, "9")
@@ -237,12 +259,17 @@ func stopPreviousRun(c *client.Client, stages []*pipeline.Stage) error {
 				return errors.Wrap(err, "Could not kill container "+stage.Name)
 			}
 		}
-		err = c.ContainerRemove(context.Background(), stage.Name,
-			types.ContainerRemoveOptions{RemoveVolumes: true,
-				Force: true})
-		if err != nil {
-			if !strings.Contains(err.Error(), "No such") {
-				return errors.Wrap(err, "Could not remove container "+stage.Name)
+
+		// if the stage has caching enabled we can't remove it just yet. Its
+		// exits codes etc. may be used in later pipeline runs
+		if !stage.Cache {
+			err = c.ContainerRemove(context.Background(), stage.Name,
+				types.ContainerRemoveOptions{RemoveVolumes: true,
+					Force: true})
+			if err != nil {
+				if !strings.Contains(err.Error(), "No such") {
+					return errors.Wrap(err, "Could not remove container "+stage.Name)
+				}
 			}
 		}
 	}
