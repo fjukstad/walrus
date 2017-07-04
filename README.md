@@ -1,15 +1,11 @@
 # Walrus
 Walrus is a small tool I built to run data analysis pipelines using Docker
 containers. It is very simple: Walrus reads a pipeline description from either a
-JSON or YAML file and starts Docker containers as described in this file. It's
-really nothing more than a fancy shell script to start Docker containers.
-
-
-
+JSON or YAML file and starts Docker containers as described in this file. 
 
 ## Pipeline 
-A pipeline has a *name*, a list of *pipeline stages*, a *version*, and a
-*comment*. See below for an example pipeline. 
+A pipeline has a *name*, a list of *pipeline stages*, and optional
+*comments*. See below for an example pipeline. 
 
 ## Pipeline stage
 A pipeline stage has a *name*, a *Docker image* it is based on, a list of
@@ -26,21 +22,8 @@ on start-up at `/walrus/INPUT_STAGENAME`. The user specifies where this
 On default it writes everything to a `walrus` directory in the current working
 directory of where the user executes the walrus command. 
 
-Walrus also writes the pipeline description to the output `walrus/.walrus`
-directory on the host if users want to investigate the pipeline that created the
-output. 
-
 ## Parallelism
 Pipeline stages that could be run in parallel are run in parallel by default. 
-
-## Pipeline Versions
-Users can use `Version` field in the pipeline description to keep track of
-different versions of a pipeline. Before starting a new pipeline Walrus checks
-the output directory for any output from previous runs and makes a hard copy of
-any output data it finds.  These are moved to directories named
-`STAGENAME-VERSION/` in the output directory using the `Version` field from the
-pipeline description. If the version field is not set it generates a version
-name for the pipeline. 
 
 # Installation and usage
 
@@ -50,12 +33,16 @@ name for the pipeline.
   filename of a pipeline description you've created.  
 
 ```
-$ walrus --help
+$ walrus --help 
 Usage of walrus:
-  -f string
+  -i string
     	pipeline description file (default "pipeline.json")
-  -output string
+  -o string
     	where walrus should store output data on the host (default "walrus")
+  -p string
+    	port to run web server for pipeline visualization (default ":9090")
+  -web
+    	host interactive visualization of the pipeline
 ```
 
 # Example pipeline
@@ -80,7 +67,6 @@ stages:
   - grep bin /walrus/stage1/file > /walrus/stage2/file2
   inputs:
   - stage1
-version: 0.1
 comment: This is the first example pipeline!
 ```
 

@@ -13,7 +13,6 @@ import (
 type Pipeline struct {
 	Name    string
 	Stages  []*Stage
-	Version string
 	Comment string
 }
 

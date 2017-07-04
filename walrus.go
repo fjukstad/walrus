@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -30,11 +29,6 @@ var completedStages []bool
 var stageIndex map[string]int
 
 func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) error {
-	// generate a version number/name if the pipeline description didn't
-	if p.Version == "" {
-		p.Version = createName()
-	}
-
 	stageMutexes = make([]*sync.Mutex, len(p.Stages))
 	completedConditions = make([]*sync.Cond, len(p.Stages))
 	completedStages = make([]bool, len(p.Stages))
@@ -297,139 +291,6 @@ func getRepoAndTag(pipelineImage string) (repo, tag string) {
 	return repo, tag
 }
 
-// Saves the pipeline configuration (json) to a new .walrus directory in the
-// output directory specified by the user. Can be used to determine what
-// produced the output in the output directory.
-func saveConfiguration(hostpath string, p *pipeline.Pipeline) error {
-	configPath := createConfigPath(hostpath)
-	err := os.Mkdir(configPath, 0777)
-	if err != nil {
-		return errors.Wrap(err, "Could not create directory to save old pipeline results")
-	}
-
-	filename := configPath + "/" + "pipeline.json"
-	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return errors.Wrap(err, "Could not open old pipeline configuration")
-	}
-	b, err := json.Marshal(p)
-	if err != nil {
-		return errors.Wrap(err, "Could not marshal pipeline configuration")
-	}
-
-	_, err = f.Write(b)
-	if err != nil {
-		return errors.Wrap(err, "Could not write pipeline configuration")
-	}
-
-	return nil
-
-}
-
-// Moves the output of the previous runs into new folders for each stage. The
-// names are STAGENAME-VERSION.
-func savePreviousRun(hostpath string) error {
-
-	// Check if there is any output from the previous runs
-	f, err := os.Open(hostpath)
-	if err != nil {
-		// Output dir does not exist, nothing to back up.
-		if os.IsNotExist(err) {
-			return nil
-		}
-
-		return errors.Wrap(err, "Could not open previous pipeline outputs")
-	}
-	files, err := f.Readdir(-1)
-	if err != nil {
-		return errors.Wrap(err, "Could not read output directory")
-	}
-
-	if len(files) == 0 {
-		return errors.Wrap(err, "No files in output directory, nothing to back up")
-	}
-
-	// Read old pipeline description to get it's version (use it for renaming)
-	configPath := createConfigPath(hostpath)
-	configFilename := configPath + "/" + "pipeline.json"
-	p, err := pipeline.ParseConfig(configFilename)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return errors.Wrap(err, "Could not parse old pipeline configuration")
-	}
-
-	absPath, err := filepath.Abs(hostpath)
-	if err != nil {
-		return errors.Wrap(err, "Could not get the absolute path of the output directory")
-	}
-
-	// iterate over all stages and move each output folder to a new directory
-	// if the stage is cached the directory is copied. .
-	for _, stage := range p.Stages {
-		newFilename := absPath + "/" + stage.Name + "-" + p.Version
-		oldFilename := absPath + "/" + stage.Name
-
-		if stage.Cache {
-			err = copyDir(oldFilename, newFilename)
-		} else {
-			err = os.Rename(oldFilename, newFilename)
-		}
-		if err != nil {
-			return errors.Wrap(err, "Could not back up pipeline stage directory")
-		}
-	}
-
-	// back up the walrus directory as well
-	walrusDirectory := configPath
-	newWalrusDirectory := walrusDirectory + "-" + p.Version
-	err = os.Rename(walrusDirectory, newWalrusDirectory)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Copies one directory to another. NOTE, only one level, not recursive yet.
-func copyDir(src, dest string) error {
-
-	err := os.Mkdir(dest, 0777)
-	if err != nil {
-		return err
-	}
-	err = filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
-		// nothing to back up
-		if err != nil {
-			return err
-		}
-
-		// if dir then create dir , else a file then copy it
-		if info.IsDir() {
-		} else {
-			srcFile, err := os.Open(path)
-			if err != nil {
-				return err
-			}
-
-			destFilename := dest + "/" + info.Name()
-			destFile, err := os.OpenFile(destFilename, os.O_CREATE, 0664)
-			if err != nil {
-				return err
-			}
-
-			_, err = io.Copy(srcFile, destFile)
-			if err != nil {
-				return err
-			}
-
-		}
-		return nil
-	})
-	return err
-}
-
 // Returns the full path of the  walrus configuration directory
 func createConfigPath(hostpath string) string {
 	return hostpath + "/" + ".walrus"
@@ -478,10 +339,10 @@ func fixMountPaths(stages []*pipeline.Stage) error {
 }
 
 func main() {
-	var configFilename = flag.String("f", "pipeline.json", "pipeline description file")
-	var outputDir = flag.String("output", "walrus", "where walrus should store output data on the host")
+	var configFilename = flag.String("i", "pipeline.json", "pipeline description file")
+	var outputDir = flag.String("o", "walrus", "where walrus should store output data on the host")
 	var web = flag.Bool("web", false, "host interactive visualization of the pipeline")
-	var port = flag.String("port", ":9090", "port to run web server for pipeline visualization")
+	var port = flag.String("p", ":9090", "port to run web server for pipeline visualization")
 
 	flag.Parse()
 
@@ -521,11 +382,6 @@ func main() {
 		return
 	}
 
-	err = savePreviousRun(hostpath)
-	if err != nil {
-		fmt.Println(err)
-	}
-
 	if *web {
 		go func() {
 			err = startPipelineVisualization(p, *port)
@@ -542,13 +398,7 @@ func main() {
 		return
 	}
 
-	err = saveConfiguration(hostpath, p)
-	if err != nil {
-		fmt.Println(err)
-		return
-	} else {
-		fmt.Println("All stages completed successfully.",
-			"\nOutput written to ", hostpath)
-	}
+	fmt.Println("All stages completed successfully.", "\nOutput written to ",
+		hostpath)
 
 }
