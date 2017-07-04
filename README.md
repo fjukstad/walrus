@@ -3,7 +3,7 @@ Walrus is a small tool I built to run data analysis pipelines using Docker
 containers. It is very simple: Walrus reads a pipeline description from either a
 JSON or YAML file and starts Docker containers as described in this file. 
 
-## Pipeline 
+# Pipeline 
 A pipeline has a *name*, a list of *pipeline stages*, and optional
 *comments*. See below for an example pipeline. 
 
@@ -24,6 +24,18 @@ directory of where the user executes the walrus command.
 
 ## Parallelism
 Pipeline stages that could be run in parallel are run in parallel by default. 
+
+# Version Control
+We reccommend that you use [git](https://git-scm.com/) to version control your
+pipeline descriptions and data. For larger datasets we reccomend
+[git-lfs](https://git-lfs.github.com/). git-lfs requires a server for hosting
+the large files, and while
+[Github](https://help.github.com/articles/about-git-large-file-storage/),
+[BitBucket](https://confluence.atlassian.com/bitbucket/git-large-file-storage-in-bitbucket-829078514.html)
+provide hosting opportunities, we have added a `-lfs-server` flag that starts a
+local [git-lfs-server](https://github.com/fjukstad/lfs-server) for use with
+`git-lfs`. Users can use this server to store files with `git-lfs` or push them
+to some other remote. 
 
 # Installation and usage
 
