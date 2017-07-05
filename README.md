@@ -4,8 +4,8 @@ containers. It is very simple: Walrus reads a pipeline description from either a
 JSON or YAML file and starts Docker containers as described in this file. 
 
 # Pipeline 
-A pipeline has a *name*, a list of *pipeline stages*, and optional
-*comments*. See below for an example pipeline. 
+A pipeline has a *name*, a list of *pipeline stages*, optional
+*comments* and *variables*. See below for an example pipeline. 
 
 ## Pipeline stage
 A pipeline stage has a *name*, a *Docker image* it is based on, a list of
@@ -25,6 +25,13 @@ directory of where the user executes the walrus command.
 ## Parallelism
 Pipeline stages that could be run in parallel are run in parallel by default. 
 
+## Variables
+You can declare variables in the pipeline description as well. You declare these
+as `{"Name": "variableName", "Value": "variableValue"}` and use them in the
+pipeline description by wrapping them like this `{{variableName}}`. See
+[pipeline.json](https://github.com/fjukstad/walrus/blob/master/example/fruit_stand_variables/pipeline.json)
+for an example. 
+    
 # Version Control
 We reccommend that you use [git](https://git-scm.com/) to version control your
 pipeline descriptions and data. For larger datasets we reccomend
