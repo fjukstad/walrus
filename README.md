@@ -49,6 +49,10 @@ $ walrus --help
 Usage of walrus:
   -i string
     	pipeline description file (default "pipeline.json")
+  -lfs-dir string
+    	host directory to store lfs objects (default "lfs")
+  -lfs-server
+    	start an lfs-server, will not run the pipeline
   -o string
     	where walrus should store output data on the host (default "walrus")
   -p string
