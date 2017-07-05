@@ -6,14 +6,21 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 )
 
 type Pipeline struct {
-	Name    string
-	Stages  []*Stage
-	Comment string
+	Name      string
+	Stages    []*Stage
+	Comment   string
+	Variables []Variable
+}
+
+type Variable struct {
+	Name  string
+	Value string
 }
 
 type Stage struct {
@@ -36,21 +43,23 @@ type Parallelism struct {
 }
 
 func ParseConfig(filename string) (*Pipeline, error) {
-	p := Pipeline{}
+
 	file, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
 
-	extension := filepath.Ext(filename)
-	if extension == ".json" {
-		err = json.Unmarshal(file, &p)
-	} else if extension == ".yaml" {
-		err = yaml.Unmarshal(file, &p)
-	} else {
-		return nil, errors.New("Pipeline description must be in json or yaml format!")
+	p, err := ReadPipelineDescription(file, filename)
+	if err != nil {
+		return nil, err
 	}
 
+	file, err = FindAndReplaceVariables(p.Variables, file)
+	if err != nil {
+		return nil, err
+	}
+
+	p, err = ReadPipelineDescription(file, filename)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +68,38 @@ func ParseConfig(filename string) (*Pipeline, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &p, nil
+}
+
+func ReadPipelineDescription(file []byte, filename string) (Pipeline, error) {
+	p := Pipeline{}
+	var err error
+
+	extension := filepath.Ext(filename)
+
+	if extension == ".json" {
+		err = json.Unmarshal(file, &p)
+	} else if extension == ".yaml" {
+		err = yaml.Unmarshal(file, &p)
+	} else {
+		return p, errors.New("Pipeline description must be in json or yaml format!")
+	}
+
+	return p, err
+}
+
+// Finds and replaces all variable names with their respective values. On
+// success it returns the file contents of the pipeline description file.
+func FindAndReplaceVariables(variables []Variable, file []byte) ([]byte, error) {
+	definition := string(file)
+
+	for _, variable := range variables {
+		definition = strings.Replace(definition, "{{"+variable.Name+"}}",
+			variable.Value, -1)
+	}
+
+	return []byte(definition), nil
 }
 
 func CheckNames(p Pipeline) error {

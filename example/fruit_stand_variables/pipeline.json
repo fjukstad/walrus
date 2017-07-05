@@ -1,0 +1,44 @@
+{
+    "Name": "fruitstand",
+    "Variables": [
+        {"Name": "inputDirectory", "Value":"/data"},
+        {"Name": "dockerImage", "Value":"ubuntu:latest"},
+        {"Name": "fruits", "Value": "apple orange banana"}
+    ], 
+    "Stages": [
+        {
+            "Name": "input",
+            "Image": "{{dockerImage}}",
+            "Cmd": [
+                "sh", "-c",
+                "cp $(inputDirectory)/* /walrus/input/"
+            ],
+            "Volumes": ["data:/data"],
+            "Cache": true
+        }, 
+        {
+            "Name": "filter",
+            "Image": "{{dockerImage}}",
+            "Cmd": [
+                "sh", "-c",
+                "for fruit in {{fruits}}; do grep $fruit /walrus/input/set1.txt | awk '{print $2}' >> /walrus/filter/$fruit; done"
+            ],
+            "Inputs" : [
+                "input"
+            ]
+        }, 
+        {
+            "Name": "sum",
+            "Image": "{{dockerImage}}",
+            "Cmd": [
+                "sh", "-c",
+                "for fruit in {{fruits}}; do { cat /walrus/filter/$fruit || echo 0; cat /walrus/filter/$fruit; } | awk '{s+=$1} END {print s}' > /walrus/sum/$fruit; done"
+            ],
+            "Inputs" : [
+                "filter"
+            ]
+        }
+    ],
+    "Version": "",
+    "Comment": "Fruit stand example pipeline from Pachyderm"
+}
