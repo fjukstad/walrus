@@ -1,0 +1,35 @@
+<head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/2.7.11/cytoscape.js"></script>
+    <script
+      src="https://code.jquery.com/jquery-3.1.1.js"
+      integrity="sha256-16cdPddA6VdVInumRGo6IbivbERE8p7CQR3HzTBuELA="
+      crossorigin="anonymous"></script>
+    <style>
+        #cy {
+            width: 500px;
+            height: 500px;
+        }
+    </style> 
+</head>
+<body>
+    <div id="cy"></div> 
+    
+    <script>
+    var cy = cytoscape({
+      container: $('#cy')
+    });
+
+
+    $.get( "/graph", function( data ) {
+        console.log(data) 
+        cy.add(JSON.parse(data).elements)
+        cy.layout({
+            name:"random"
+        });
+    });
+
+
+    </script> 
+
+</body>
+
