@@ -12,10 +12,11 @@ import (
 )
 
 type Pipeline struct {
-	Name      string
-	Stages    []*Stage
-	Comment   string
-	Variables []Variable
+	Name           string
+	Stages         []*Stage
+	Comment        string
+	Variables      []Variable
+	VersionControl bool
 }
 
 type Variable struct {
@@ -35,6 +36,7 @@ type Stage struct {
 	Cache            bool
 	Comment          string
 	MountPropagation string
+	Version          string
 }
 
 type Parallelism struct {

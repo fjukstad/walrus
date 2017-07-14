@@ -16,6 +16,7 @@ import (
 
 	"github.com/fjukstad/walrus/lfs"
 	"github.com/fjukstad/walrus/pipeline"
+	"github.com/fjukstad/walrus/vc"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -184,16 +185,29 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 				e <- errors.New(stage.Name + " failed with exit code " + strconv.Itoa(exitCode) + "\n" + errmsg + "\n" + logs)
 				return
 			}
+
 			fmt.Println(stage.Name, "completed successfully.")
 
 			e <- nil
 		}(i, stage)
 	}
 	var err error
-	for i := 0; i < len(p.Stages); i++ {
+	for _, stage := range p.Stages {
 		err = <-e
 		if err != nil {
 			fmt.Println(err)
+		}
+		if p.VersionControl {
+
+			hostpath := rootpath + "/" + stage.Name
+			// commit output data
+			commitId, err := vc.AddAndCommitData(hostpath)
+			if err != nil {
+				e <- errors.Wrap(err, "Could not commit output data "+stage.Name)
+				fmt.Println(err)
+			}
+			fmt.Println("Commited data commitId:", commitId)
+
 		}
 	}
 
@@ -346,6 +360,7 @@ func main() {
 	var port = flag.String("p", ":9090", "port to run web server for pipeline visualization")
 	var lfsServer = flag.Bool("lfs-server", false, "start an lfs-server, will not run the pipeline")
 	var lfsDir = flag.String("lfs-dir", "lfs", "host directory to store lfs objects")
+	var versionControl = flag.Bool("version-control", true, "version control output data automatically")
 
 	flag.Parse()
 
@@ -381,6 +396,8 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+
+	p.VersionControl = *versionControl
 
 	err = fixMountPaths(p.Stages)
 	if err != nil {

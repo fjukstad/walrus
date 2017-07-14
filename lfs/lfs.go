@@ -2,7 +2,9 @@ package lfs
 
 import (
 	"context"
+	"os/exec"
 	"path/filepath"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -12,6 +14,18 @@ import (
 	"github.com/pkg/errors"
 )
 
+// git lfs track
+// Since the git-lfs devs discourage using git-lfs in go projects we're just
+// calling the git-lfs CLI.
+func Track(filename, repositoryLocation string) (string, error) {
+	cmd := exec.Command("git-lfs", "track", filename)
+	cmd.Dir = repositoryLocation
+	out, err := cmd.Output()
+	time.Sleep(2 * time.Second)
+	return string(out), err
+}
+
+// Starts a git-lfs server in a Docker container
 func StartServer(mountDir string) error {
 
 	c, err := client.NewEnvClient()
