@@ -75,7 +75,7 @@ func AddAndCommitData(inputPath string) (string, error) {
 	}
 
 	if changed {
-		_, err := addAndCommit(repo, gitAttr, "update .gitignore to track output files")
+		err := add(repo, gitAttr)
 		if err != nil {
 			return "", err
 		}
@@ -123,64 +123,12 @@ func commit(path, msg string) (string, error) {
 		return "", err
 	}
 
-	currentBranch, err := repo.Head()
-	if err != nil {
-		return "", err
-	}
-
-	currentTip, err := repo.LookupCommit(currentBranch.Target())
-	if err != nil {
-		return "", err
-	}
-
 	var sig = &git.Signature{
 		"walrus",
 		"walrus@walr.us",
 		time.Now(),
 	}
-
-	commitId, err := repo.CreateCommit("HEAD", sig, sig, msg, tree, currentTip)
-	if err != nil {
-		return "", err
-	}
-
-	return commitId.String(), nil
-}
-
-func addAndCommit(repo *git.Repository, path, msg string) (string, error) {
-
-	index, err := repo.Index()
-	if err != nil {
-		return "", err
-	}
-
-	err = index.AddByPath(path)
-	if err != nil {
-		return "", err
-	}
-
-	treeId, err := index.WriteTree()
-	if err != nil {
-		return "", err
-	}
-
-	tree, err := repo.LookupTree(treeId)
-	if err != nil {
-		return "", err
-	}
-
-	err = index.Write()
-	if err != nil {
-		return "", err
-	}
-
 	var commitId *git.Oid
-
-	var sig = &git.Signature{
-		"walrus",
-		"walrus@walr.us",
-		time.Now(),
-	}
 
 	currentBranch, err := repo.Head()
 	if err != nil {
@@ -192,7 +140,6 @@ func addAndCommit(repo *git.Repository, path, msg string) (string, error) {
 		}
 		commitId, err = repo.CreateCommit("HEAD", sig, sig, msg, tree, currentTip)
 	}
-
 	if err != nil {
 		return "", err
 	}
@@ -202,7 +149,32 @@ func addAndCommit(repo *git.Repository, path, msg string) (string, error) {
 		return "", err
 	}
 
-	return commitId.String(), err
+	return commitId.String(), nil
+}
+
+func add(repo *git.Repository, path string) error {
+
+	index, err := repo.Index()
+	if err != nil {
+		return err
+	}
+
+	err = index.AddByPath(path)
+	if err != nil {
+		return err
+	}
+
+	_, err = index.WriteTree()
+	if err != nil {
+		return err
+	}
+
+	err = index.Write()
+	if err != nil {
+		return err
+	}
+
+	return err
 }
 
 // Returns true if file is new, modified or deleted
