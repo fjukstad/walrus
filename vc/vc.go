@@ -21,37 +21,39 @@ func AddAndCommitData(inputPath string) (string, error) {
 
 	path := inputPath
 
-	repositoryLocation := popLastDirectory(inputPath)
+	defaultRepositoryLocation := popLastDirectory(inputPath)
 
-	// Set working dir for git commands. Will set it to its original working
-	// directory when the function exits
+	// Get current working dir. We'll set it later to the repository location
+	// and reset it back to its previous when the function returns.
 	wd, err := os.Getwd()
 	if err != nil {
 		return "", err
 	}
-	os.Chdir(repositoryLocation)
 	defer os.Chdir(wd)
 
 	// Traverses a directory tree outwards until it a) finds a git repository or
 	// b) hits the root (/)
 	for {
-		path = filepath.Dir(path)
 		repo, err = git.OpenRepository(path)
 		if err != nil {
 			path = popLastDirectory(path)
-
 			if path == "/" {
-				fmt.Println("Output directory is not in a git repository. Creating one in the parent directory")
-				repo, err = git.InitRepository(repositoryLocation, false)
+				fmt.Println("Output directory is not in a git repository. Creating one.")
+				repo, err = git.InitRepository(defaultRepositoryLocation, false)
 				if err != nil {
 					return "", errors.Wrap(err, "Could not initialize git repository")
 				}
 				break
 			}
 		} else {
+			fmt.Println("Repository found in ", repo.Path())
 			break
 		}
 	}
+
+	repositoryLocation := path
+
+	os.Chdir(repositoryLocation)
 
 	dataPath, err := filepath.Rel(repositoryLocation, inputPath)
 	if err != nil {
@@ -76,7 +78,7 @@ func AddAndCommitData(inputPath string) (string, error) {
 		}
 		return commitId, nil
 	}
-	return "fuckthis", nil
+	return "commitID", nil
 }
 
 func addAndCommit(repo *git.Repository, path string) (string, error) {
