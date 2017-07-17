@@ -86,7 +86,19 @@ func AddAndCommitData(inputPath string) (string, error) {
 		return "", errors.Wrap(err, "Could not add files "+output)
 	}
 
-	repo, err = git.OpenRepository(path)
+	msg := "add data output folder " + dataPath
+	commitId, err := commit(path, msg)
+	if err != nil {
+		return "", err
+	}
+
+	return commitId, nil
+}
+
+// commits staged changes
+func commit(path, msg string) (string, error) {
+
+	repo, err := git.OpenRepository(path)
 	if err != nil {
 		return "", err
 	}
@@ -127,7 +139,7 @@ func AddAndCommitData(inputPath string) (string, error) {
 		time.Now(),
 	}
 
-	commitId, err := repo.CreateCommit("HEAD", sig, sig, "add data output folder "+dataPath, tree, currentTip)
+	commitId, err := repo.CreateCommit("HEAD", sig, sig, msg, tree, currentTip)
 	if err != nil {
 		return "", err
 	}
@@ -218,22 +230,4 @@ func popLastDirectory(path string) string {
 	list = list[0 : len(list)-1]
 	path = "/" + filepath.Join(list...)
 	return path
-}
-func trackData(path string) error {
-	return nil
-}
-
-func addData(path string) error {
-
-	return nil
-}
-
-func commitData(path string) error {
-
-	return nil
-}
-
-func addAndCommitData(path string) error {
-
-	return nil
 }
