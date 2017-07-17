@@ -81,28 +81,20 @@ func AddAndCommitData(inputPath string) (string, error) {
 		}
 	}
 
-	index, err := repo.Index()
+	output, err = lfs.Add(dataPath, repositoryLocation)
+	if err != nil {
+		return "", errors.Wrap(err, "Could not add files "+output)
+	}
+
+	repo, err = git.OpenRepository(path)
 	if err != nil {
 		return "", err
 	}
 
-	// traverse the directory and add changed files to the index
-	err = filepath.Walk(dataPath, func(path string, info os.FileInfo, err error) error {
-		if !info.IsDir() {
-			changed, err := fileChanged(repo, path)
-			if err != nil {
-				return err
-			}
-
-			if changed {
-				err = index.AddByPath(path)
-				if err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	})
+	index, err := repo.Index()
+	if err != nil {
+		return "", err
+	}
 
 	treeId, err := index.WriteTree()
 	if err != nil {
@@ -136,8 +128,11 @@ func AddAndCommitData(inputPath string) (string, error) {
 	}
 
 	commitId, err := repo.CreateCommit("HEAD", sig, sig, "add data output folder "+dataPath, tree, currentTip)
+	if err != nil {
+		return "", err
+	}
 
-	return commitId.String(), err
+	return commitId.String(), nil
 }
 
 func addAndCommit(repo *git.Repository, path, msg string) (string, error) {

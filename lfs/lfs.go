@@ -33,6 +33,19 @@ func Track(filename, repositoryLocation string) (string, error) {
 	return output, err
 }
 
+// git add
+// To speed up dev time for the prototype, use the exec pkg not git2go package
+// to add files. Future versions will get rid of this hacky way of doing things
+// by creating the blobs, softlinks etc. but that's for later!
+func Add(path, repositoryLocation string) (string, error) {
+	cmd := exec.Command("git", "add", path)
+	cmd.Dir = repositoryLocation
+	out, err := cmd.Output()
+	output := string(out)
+	output = strings.TrimRight(output, "\n")
+	return output, err
+}
+
 // Starts a git-lfs server in a Docker container
 func StartServer(mountDir string) error {
 
