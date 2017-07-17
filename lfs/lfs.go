@@ -4,6 +4,7 @@ import (
 	"context"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -21,8 +22,15 @@ func Track(filename, repositoryLocation string) (string, error) {
 	cmd := exec.Command("git-lfs", "track", filename)
 	cmd.Dir = repositoryLocation
 	out, err := cmd.Output()
+
+	// wait to ensure .gitattributes file is up to date.
+	// a monument to all my sins.
 	time.Sleep(2 * time.Second)
-	return string(out), err
+
+	output := string(out)
+	output = strings.TrimRight(output, "\n")
+
+	return output, err
 }
 
 // Starts a git-lfs server in a Docker container
