@@ -194,20 +194,19 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 	for _, stage := range p.Stages {
 		err = <-e
 		if err != nil {
-			fmt.Println(err)
+			return err
 		}
 		if p.VersionControl {
-
 			hostpath := rootpath + "/" + stage.Name
-			// commit output data
+			// add and commit output data
 			msg := "Add data pipeline stage: " + stage.Name
 			commitId, err := lfs.AddAndCommitData(hostpath, msg)
 			if err != nil {
 				e <- errors.Wrap(err, "Could not commit output data "+stage.Name)
 				fmt.Println(err)
 			}
+			stage.Version = commitId
 			fmt.Println("Commited data commitId:", commitId)
-
 		}
 	}
 
@@ -219,7 +218,7 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 	// 	return err
 	// }
 
-	return err
+	return nil
 }
 
 func writeLogs(logs, path string) error {
@@ -430,4 +429,14 @@ func main() {
 	fmt.Println("All stages completed successfully.", "\nOutput written to ",
 		hostpath)
 
+	for _, stage := range p.Stages {
+		fmt.Println(stage.Version)
+	}
+
+	err = p.WritePipelineDescription(*outputDir + "/" + *configFilename)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	return
 }

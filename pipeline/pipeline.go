@@ -91,6 +91,25 @@ func ReadPipelineDescription(file []byte, filename string) (Pipeline, error) {
 	return p, err
 }
 
+func (p *Pipeline) WritePipelineDescription(filename string) error {
+	var b []byte
+	var err error
+
+	switch extension := filepath.Ext(filename); extension {
+	case ".json":
+		b, err = json.Marshal(p)
+	case ".yaml":
+		b, err = yaml.Marshal(p)
+	}
+
+	err = ioutil.WriteFile(filename, b, 06444)
+	if err != nil {
+		return err
+	}
+	return nil
+
+}
+
 // Finds and replaces all variable names with their respective values. On
 // success it returns the file contents of the pipeline description file.
 func FindAndReplaceVariables(variables []Variable, file []byte) ([]byte, error) {
