@@ -3,6 +3,7 @@ package lfs
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,6 +23,7 @@ import (
 // Since the git-lfs devs discourage using git-lfs in go projects we're just
 // calling the git-lfs CLI.
 func Track(filename, repositoryLocation string) (string, error) {
+
 	cmd := exec.Command("git-lfs", "track", filename)
 	cmd.Dir = repositoryLocation
 	out, err := cmd.Output()
@@ -77,12 +79,24 @@ func Add(path string) (string, error) {
 	// git PATTERN FORMAT description for more details.
 	dataPattern := "" + dataPath + "/**"
 
-	output, err := Track(dataPattern, repositoryLocation)
+	gitAttr := ".gitattributes"
+
+	// if pattern already exists don't rerun the track command
+	b, err := ioutil.ReadFile(gitAttr)
 	if err != nil {
-		return "", errors.Wrap(err, "Could not track files using git-lfs: "+output)
+		pe := err.(*os.PathError)
+		if pe.Err.Error() != "no such file or directory" {
+			return "", err
+		}
 	}
 
-	gitAttr := ".gitattributes"
+	if !strings.Contains(string(b), dataPattern) {
+		output, err := Track(dataPattern, repositoryLocation)
+		if err != nil {
+			return "", errors.Wrap(err, "Could not track files using git-lfs: "+output)
+		}
+	}
+
 	changed, err := fileChanged(repo, gitAttr)
 	if err != nil {
 		return "", err
@@ -95,7 +109,7 @@ func Add(path string) (string, error) {
 		}
 	}
 
-	output, err = add(dataPath, repositoryLocation)
+	output, err := add(dataPath, repositoryLocation)
 	if err != nil {
 		return "", errors.Wrap(err, "Could not add files "+output)
 	}
