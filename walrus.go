@@ -16,7 +16,6 @@ import (
 
 	"github.com/fjukstad/walrus/lfs"
 	"github.com/fjukstad/walrus/pipeline"
-	"github.com/fjukstad/walrus/vc"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -201,7 +200,8 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 
 			hostpath := rootpath + "/" + stage.Name
 			// commit output data
-			commitId, err := vc.AddAndCommitData(hostpath)
+			msg := "Add data pipeline stage: " + stage.Name
+			commitId, err := lfs.AddAndCommitData(hostpath, msg)
 			if err != nil {
 				e <- errors.Wrap(err, "Could not commit output data "+stage.Name)
 				fmt.Println(err)
