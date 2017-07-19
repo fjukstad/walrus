@@ -357,7 +357,7 @@ func main() {
 	var web = flag.Bool("web", false, "host interactive visualization of the pipeline")
 	var port = flag.String("p", ":9090", "port to run web server for pipeline visualization")
 	var lfsServer = flag.Bool("lfs-server", false, "start an lfs-server, will not run the pipeline")
-	var lfsDir = flag.String("lfs-dir", "lfs", "host directory to store lfs objects")
+	var lfsDir = flag.String("lfs-server-dir", "lfs", "host directory to store lfs objects")
 	var versionControl = flag.Bool("version-control", true, "version control output data automatically")
 
 	flag.Parse()
