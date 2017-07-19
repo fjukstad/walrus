@@ -206,7 +206,6 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 				fmt.Println(err)
 			}
 			stage.Version = commitId
-			fmt.Println("Commited data commitId:", commitId)
 		}
 	}
 

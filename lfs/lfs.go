@@ -41,38 +41,42 @@ func Track(filename, repositoryLocation string) (string, error) {
 // Adds and commits data found in inputPath
 func AddAndCommitData(path, msg string) (string, error) {
 
-	repositoryLocation, err := Add(path)
+	changes, repositoryLocation, err := Add(path)
 	if err != nil {
 		return "", err
 	}
 
-	commitId, err := commit(repositoryLocation, msg)
-	if err != nil {
-		return "", err
+	var commitId string
+	if changes {
+		commitId, err = commit(repositoryLocation, msg)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	return commitId, nil
 }
 
-// Add the given path to the
-func Add(path string) (string, error) {
+// Add the given path to the index. Will return true if there's anything to be
+// committed.
+func Add(path string) (changes bool, repositoryLocation string, err error) {
 
 	wd, err := os.Getwd()
 	if err != nil {
-		return "", err
+		return false, "", err
 	}
 	defer os.Chdir(wd)
 
 	repo, repositoryLocation, err := openRepository(path)
 	if err != nil {
-		return "", err
+		return false, "", err
 	}
 
 	os.Chdir(repositoryLocation)
 
 	dataPath, err := filepath.Rel(repositoryLocation, path)
 	if err != nil {
-		return "", err
+		return false, "", err
 	}
 
 	// ensure git-lfs tracks all files recursively by adding ** pattern, see
@@ -86,35 +90,62 @@ func Add(path string) (string, error) {
 	if err != nil {
 		pe := err.(*os.PathError)
 		if pe.Err.Error() != "no such file or directory" {
-			return "", err
+			return false, "", err
 		}
 	}
 
 	if !strings.Contains(string(b), dataPattern) {
 		output, err := Track(dataPattern, repositoryLocation)
 		if err != nil {
-			return "", errors.Wrap(err, "Could not track files using git-lfs: "+output)
+			return false, "", errors.Wrap(err, "Could not track files using git-lfs: "+output)
 		}
 	}
 
 	changed, err := fileChanged(repo, gitAttr)
 	if err != nil {
-		return "", err
+		return false, "", err
 	}
 
 	if changed {
 		err := addToIndex(repo, gitAttr)
 		if err != nil {
-			return "", err
+			return false, "", err
+		}
+		changes = changed
+	}
+
+	changed = false
+
+	err = filepath.Walk(dataPath, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+		changedFile, err := fileChanged(repo, path)
+		if err != nil {
+			return err
+		}
+		// One file is changed we can return
+		if changedFile {
+			changed = true
+			return nil
+		}
+		return nil
+	})
+
+	fmt.Println("CHANGED:", changed)
+
+	if err != nil {
+		return false, "", err
+	}
+	if changed {
+		output, err := add(dataPath, repositoryLocation)
+		if err != nil {
+			return false, "", errors.Wrap(err, "Could not add files "+output)
 		}
 	}
+	changes = changed
+	return changes, repositoryLocation, nil
 
-	output, err := add(dataPath, repositoryLocation)
-	if err != nil {
-		return "", errors.Wrap(err, "Could not add files "+output)
-	}
-
-	return repositoryLocation, nil
 }
 
 func addToIndex(repo *git.Repository, path string) error {
