@@ -31,12 +31,29 @@ as `{"Name": "variableName", "Value": "variableValue"}` and use them in the
 pipeline description by wrapping them like this `{{variableName}}`. See
 [pipeline.json](https://github.com/fjukstad/walrus/blob/master/example/fruit_stand_variables/pipeline.json)
 for an example. 
-    
-# Version Control
+
+# Reproducible pipelines 
+## Tools
+Since walrus requires that tools are packaged within Docker containers, it
+provides a simple mechanism to ensure a reproducible execution envirionment. 
+
+## Parameters
 We reccommend that you use [git](https://git-scm.com/) to version control your
-pipeline descriptions and data. For larger datasets we reccomend
-[git-lfs](https://git-lfs.github.com/). git-lfs requires a server for hosting
-the large files, and while
+pipeline descriptions. This will ensure that you can keep track of the different 
+parameters to the different tools as you develop your analysis pipeline.
+
+## Data
+Walrus automatically tracks data in the pipeline with
+[git-lfs](https://git-lfs.github.com/). When users start a pipeline walrus will
+track any output data from any of the pipeline stages and commit them to the
+repository versioning the pipeline description, If you do not have a repository
+walrus will set one up for you.
+
+Using git to version control your pipeline data is completely
+optional, and  users can of course opt out of versioning data with `git-lfs` by
+using the `walrus -version-control=false` parameter. 
+
+git-lfs requires a server for hosting the large files, and while
 [Github](https://help.github.com/articles/about-git-large-file-storage/),
 [BitBucket](https://confluence.atlassian.com/bitbucket/git-large-file-storage-in-bitbucket-829078514.html)
 provide hosting opportunities, we have added a `-lfs-server` flag that starts a
@@ -44,28 +61,45 @@ local [git-lfs-server](https://github.com/fjukstad/lfs-server) for use with
 `git-lfs`. Users can use this server to store files with `git-lfs` or push them
 to some other remote. 
 
-# Installation and usage
+### Performance
+You may experience that `git-lfs` uses some time to start keeping
+track of your data. Adding the NA12878 WGS (270GB) bam file takes roughly 1 hour
+on our fat server (80 Intel xenon CPUs, 10 cores/CPU, ~1TB memory). Bear in mind
+that `git-lfs` runs on a single CPU. Most of the time spent is simply copying
+the data into the `.git/lfs` folder. Hopefully this will improve in later
+versions of `git-lfs`. 
 
-- Install [go](http://golang.org). 
+# Installation
+## Prerequisites 
+- [git](https://git-scm.com/downloads) and [git-lfs](https://git-lfs.github.com/) 
+  if you want to version control your data.  
+- [go](http://golang.org). 
+
+## Install 
 - `go get github.com/fjukstad/walrus`
-- `walrus -f $PIPELINE_DESCRIPTION` where `$PIPELINE_DESCRIPTION` is the
-  filename of a pipeline description you've created.  
+
+# Usage 
+
+`walrus -f $PIPELINE_DESCRIPTION` where `$PIPELINE_DESCRIPTION` is the filename
+of a pipeline description you've created.  
 
 ```
 $ walrus --help 
 Usage of walrus:
   -i string
     	pipeline description file (default "pipeline.json")
-  -lfs-dir string
-    	host directory to store lfs objects (default "lfs")
   -lfs-server
     	start an lfs-server, will not run the pipeline
+  -lfs-server-dir string
+    	host directory to store lfs objects (default "lfs")
   -o string
     	where walrus should store output data on the host (default "walrus")
   -p string
     	port to run web server for pipeline visualization (default ":9090")
+  -version-control
+    	version control output data automatically (default true)
   -web
-    	host interactive visualization of the pipeline
+    	host interactive visualization of the pipeline```
 ```
 
 # Example pipeline
