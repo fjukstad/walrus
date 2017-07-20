@@ -1,17 +1,5 @@
-# WGS GATK example
-Small example pipeline to CountReads and loci in an example WGS dataset. This is
-the pipeline outlined in [(howto) RUN the GATK for the first
-time](https://software.broadinstitute.org/gatk/documentation/article?id=1209).
-
-It consists of three steps: read input datasets into walrus, run CountReads,
-and run CountLoci. walrus will run CountReands and CountLoci in parallel since
-they are independent of each other. 
-
-# pipeline.json
-
-```
 { 
-    "Name" : "wgs-example" ,
+    "Name" : "gatk-example" ,
     "Variables": [
         { "Name": "sampleBAM" , "Value":"exampleBAM.bam"},
         { "Name": "sampleFASTA", "Value":"exampleFASTA.fasta"}
@@ -47,16 +35,4 @@ they are independent of each other.
         }
     ]
 }
-```
 
-
-# Run 
-
-```
-$ walrus -version-control=false
-input completed successfully.
-CountReads completed successfully.
-CountLoci completed successfully.
-All stages completed successfully. 
-Output written to ...
-```
