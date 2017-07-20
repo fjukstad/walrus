@@ -359,6 +359,7 @@ func main() {
 	var lfsServer = flag.Bool("lfs-server", false, "start an lfs-server, will not run the pipeline")
 	var lfsDir = flag.String("lfs-server-dir", "lfs", "host directory to store lfs objects")
 	var versionControl = flag.Bool("version-control", true, "version control output data automatically")
+	var logs = flag.String("logs", "", "get logs for pipeline stage")
 
 	flag.Parse()
 
@@ -369,6 +370,19 @@ func main() {
 		} else {
 			fmt.Println("git-lfs server started successfully")
 		}
+		return
+	}
+
+	if *logs != "" {
+		stageName := *logs
+		filename := *outputDir + "/" + stageName + "/walrus.log"
+		b, err := ioutil.ReadFile(filename)
+		if err != nil {
+			fmt.Println("Could not read logs for stage: " + stageName)
+			fmt.Println(err)
+			return
+		}
+		fmt.Println(string(b))
 		return
 	}
 

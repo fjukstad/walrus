@@ -92,6 +92,8 @@ Usage of walrus:
     	start an lfs-server, will not run the pipeline
   -lfs-server-dir string
     	host directory to store lfs objects (default "lfs")
+  -logs string
+    	get logs for pipeline stage
   -o string
     	where walrus should store output data on the host (default "walrus")
   -p string
@@ -99,7 +101,7 @@ Usage of walrus:
   -version-control
     	version control output data automatically (default true)
   -web
-    	host interactive visualization of the pipeline```
+    	host interactive visualization of the pipeline
 ```
 
 # Example pipeline
