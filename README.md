@@ -61,6 +61,14 @@ local [git-lfs-server](https://github.com/fjukstad/lfs-server) for use with
 `git-lfs`. Users can use this server to store files with `git-lfs` or push them
 to some other remote. 
 
+### Performance
+Note that you may experience that `git-lfs` uses some time to start keeping
+track of your data. Adding the NA12878 WGS (270GB) bam file takes roughly 1 hour
+on our fat server (80 Intel xenon CPUs, 10 cores/CPU, ~1TB memory). Bear in mind
+that `git-lfs` runs on a single CPU. Most of the time spent is simply copying
+the data into the `.git/lfs` folder. Hopefully this will improve in later
+versions of `git-lfs`. 
+
 # Installation
 ## Prerequisites 
 - [git](https://git-scm.com/downloads) and [git-lfs](https://git-lfs.github.com/) 
