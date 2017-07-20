@@ -49,9 +49,9 @@ track any output data from any of the pipeline stages and commit them to the
 repository versioning the pipeline description, If you do not have a repository
 walrus will set one up for you.
 
-Note that using git is completely optional, and  users can of course opt out of
-versioning data with `git-lfs` by using the `walrus -version-control=false`
-parameter. 
+Using git to version control your pipeline data is completely
+optional, and  users can of course opt out of versioning data with `git-lfs` by
+using the `walrus -version-control=false` parameter. 
 
 git-lfs requires a server for hosting the large files, and while
 [Github](https://help.github.com/articles/about-git-large-file-storage/),
@@ -62,7 +62,7 @@ local [git-lfs-server](https://github.com/fjukstad/lfs-server) for use with
 to some other remote. 
 
 ### Performance
-Note that you may experience that `git-lfs` uses some time to start keeping
+You may experience that `git-lfs` uses some time to start keeping
 track of your data. Adding the NA12878 WGS (270GB) bam file takes roughly 1 hour
 on our fat server (80 Intel xenon CPUs, 10 cores/CPU, ~1TB memory). Bear in mind
 that `git-lfs` runs on a single CPU. Most of the time spent is simply copying
