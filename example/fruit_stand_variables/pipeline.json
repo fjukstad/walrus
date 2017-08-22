@@ -11,7 +11,7 @@
             "Image": "{{dockerImage}}",
             "Cmd": [
                 "sh", "-c",
-                "cp $(inputDirectory)/* /walrus/input/"
+                "cp {{inputDirectory}}/* /walrus/input/"
             ],
             "Volumes": ["data:/data"],
             "Cache": true

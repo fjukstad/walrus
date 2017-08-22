@@ -12,10 +12,11 @@ import (
 )
 
 type Pipeline struct {
-	Name      string
-	Stages    []*Stage
-	Comment   string
-	Variables []Variable
+	Name           string
+	Stages         []*Stage
+	Comment        string
+	Variables      []Variable
+	VersionControl bool
 }
 
 type Variable struct {
@@ -35,6 +36,7 @@ type Stage struct {
 	Cache            bool
 	Comment          string
 	MountPropagation string
+	Version          string
 }
 
 type Parallelism struct {
@@ -87,6 +89,25 @@ func ReadPipelineDescription(file []byte, filename string) (Pipeline, error) {
 	}
 
 	return p, err
+}
+
+func (p *Pipeline) WritePipelineDescription(filename string) error {
+	var b []byte
+	var err error
+
+	switch extension := filepath.Ext(filename); extension {
+	case ".json":
+		b, err = json.Marshal(p)
+	case ".yaml":
+		b, err = yaml.Marshal(p)
+	}
+
+	err = ioutil.WriteFile(filename, b, 06444)
+	if err != nil {
+		return err
+	}
+	return nil
+
 }
 
 // Finds and replaces all variable names with their respective values. On

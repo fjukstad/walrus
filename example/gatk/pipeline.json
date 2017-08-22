@@ -1,0 +1,38 @@
+{ 
+    "Name" : "gatk-example" ,
+    "Variables": [
+        { "Name": "sampleBAM" , "Value":"exampleBAM.bam"},
+        { "Name": "sampleFASTA", "Value":"exampleFASTA.fasta"}
+    ],
+    "Stages": [
+            {
+            "Name": "input",
+            "Image": "ubuntu",
+            "Cmd": [
+                "sh", "-c",
+                "cp /data/{{sample}}* /walrus/input/"
+            ],
+            "Volumes": ["data:/data"],
+            "Cache": true
+        },
+        {
+            "Name": "CountReads",
+            "Image": "fjukstad/gatk",
+            "Cmd": [
+                "-T", "CountReads", "-R", "/walrus/input/{{sampleFASTA}}", "-I",
+                "/walrus/input/{{sampleBAM}}" 
+            ],
+            "Inputs": ["input"]
+        },
+        {
+            "Name": "CountLoci",
+            "Image": "fjukstad/gatk",
+            "Cmd": [
+                "-T", "CountLoci", "-R", "/walrus/input/{{sampleFASTA}}", "-I",
+                "/walrus/input/{{sampleBAM}}", "-o","/walrus/CountLoci/output.txt"
+            ],
+            "Inputs": ["input"]
+        }
+    ]
+}
+

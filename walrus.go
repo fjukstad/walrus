@@ -184,16 +184,28 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 				e <- errors.New(stage.Name + " failed with exit code " + strconv.Itoa(exitCode) + "\n" + errmsg + "\n" + logs)
 				return
 			}
+
 			fmt.Println(stage.Name, "completed successfully.")
 
 			e <- nil
 		}(i, stage)
 	}
 	var err error
-	for i := 0; i < len(p.Stages); i++ {
+	for _, stage := range p.Stages {
 		err = <-e
 		if err != nil {
-			fmt.Println(err)
+			return err
+		}
+		if p.VersionControl {
+			hostpath := rootpath + "/" + stage.Name
+			// add and commit output data
+			msg := "Add data pipeline stage: " + stage.Name
+			commitId, err := lfs.AddAndCommitData(hostpath, msg)
+			if err != nil {
+				e <- errors.Wrap(err, "Could not commit output data "+stage.Name)
+				fmt.Println(err)
+			}
+			stage.Version = commitId
 		}
 	}
 
@@ -205,7 +217,7 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 	// 	return err
 	// }
 
-	return err
+	return nil
 }
 
 func writeLogs(logs, path string) error {
@@ -345,7 +357,9 @@ func main() {
 	var web = flag.Bool("web", false, "host interactive visualization of the pipeline")
 	var port = flag.String("p", ":9090", "port to run web server for pipeline visualization")
 	var lfsServer = flag.Bool("lfs-server", false, "start an lfs-server, will not run the pipeline")
-	var lfsDir = flag.String("lfs-dir", "lfs", "host directory to store lfs objects")
+	var lfsDir = flag.String("lfs-server-dir", "lfs", "host directory to store lfs objects")
+	var versionControl = flag.Bool("version-control", true, "version control output data automatically")
+	var logs = flag.String("logs", "", "get logs for pipeline stage")
 
 	flag.Parse()
 
@@ -356,6 +370,19 @@ func main() {
 		} else {
 			fmt.Println("git-lfs server started successfully")
 		}
+		return
+	}
+
+	if *logs != "" {
+		stageName := *logs
+		filename := *outputDir + "/" + stageName + "/walrus.log"
+		b, err := ioutil.ReadFile(filename)
+		if err != nil {
+			fmt.Println("Could not read logs for stage: " + stageName)
+			fmt.Println(err)
+			return
+		}
+		fmt.Println(string(b))
 		return
 	}
 
@@ -381,6 +408,8 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+
+	p.VersionControl = *versionControl
 
 	err = fixMountPaths(p.Stages)
 	if err != nil {
@@ -413,4 +442,14 @@ func main() {
 	fmt.Println("All stages completed successfully.", "\nOutput written to ",
 		hostpath)
 
+	for _, stage := range p.Stages {
+		fmt.Println(stage.Version)
+	}
+
+	err = p.WritePipelineDescription(*outputDir + "/" + *configFilename)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	return
 }
