@@ -84,12 +84,16 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 			}
 
 			// If the stage can be cached, check for a previous run. If this
-			// container does not exist we need to run the stage again!
+			// container does not exist we need to run the stage again. Also if
+			// a cached stage has failed we'll need to re run it.
 			if stage.Cache {
-				_, _, err = exitCode(c, stage.Name)
+				code, _, err := exitCode(c, stage.Name)
 				if err != nil {
 					fmt.Println(err)
 					fmt.Println("Warning: Could not find cached container", stage.Name, "will re-run the stage")
+					stage.Cache = false
+				}
+				if code != 0 {
 					stage.Cache = false
 				}
 			}
