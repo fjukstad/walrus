@@ -1,6 +1,7 @@
 { 
-    "Name" : "gatk-example" ,
+    "Name" : "gatkexample" ,
     "Variables": [
+        { "Name": "sample" , "Value":"example"},
         { "Name": "sampleBAM" , "Value":"exampleBAM.bam"},
         { "Name": "sampleFASTA", "Value":"exampleFASTA.fasta"}
     ],
