@@ -50,8 +50,13 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 
 	for i, stage := range p.Stages {
 		go func(i int, stage *pipeline.Stage) {
-			mountpath := "/walrus/" + stage.Name
-			hostpath := rootpath + "/" + stage.Name
+
+			// Even if might be a parallel stage we only use the first part of
+			// the name
+			stageName := strings.Split(stage.Name, "_")[0]
+
+			mountpath := "/walrus/" + stageName
+			hostpath := rootpath + "/" + stageName
 
 			repo, tag := getRepoAndTag(stage.Image)
 			image := repo + ":" + tag
@@ -70,12 +75,15 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 			}
 
 			// If the stage has any inputs it waits for these stages to complete
-			// before starting
+			// before starting.
+
 			if len(stage.Inputs) > 0 {
 				for _, input := range stage.Inputs {
+
 					index := stageIndex[input]
 					cond := completedConditions[index]
 					cond.L.Lock()
+
 					for !completedStages[index] {
 						cond.Wait()
 					}
