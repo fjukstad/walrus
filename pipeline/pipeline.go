@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v2"
 )
@@ -17,6 +18,7 @@ type Pipeline struct {
 	Comment        string
 	Variables      []Variable
 	VersionControl bool
+	Runtime        time.Duration
 }
 
 type Variable struct {
@@ -38,6 +40,7 @@ type Stage struct {
 	MountPropagation string
 	Version          string
 	remove           bool
+	Runtime          time.Duration
 }
 
 type Parallelism struct {
@@ -100,7 +103,7 @@ func (p Pipeline) WritePipelineDescription(filename string) error {
 		b, err = yaml.Marshal(p)
 	}
 
-	err = ioutil.WriteFile(filename, b, 06444)
+	err = ioutil.WriteFile(filename, b, 06666)
 	if err != nil {
 		return err
 	}

@@ -16,6 +16,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	git "github.com/libgit2/git2go"
+
 	"github.com/pkg/errors"
 )
 

@@ -30,9 +30,15 @@ var completedStages []bool
 var stageIndex map[string]int
 
 func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) error {
+
 	stageMutexes = make([]*sync.Mutex, len(p.Stages))
 	completedConditions = make([]*sync.Cond, len(p.Stages))
 	completedStages = make([]bool, len(p.Stages))
+
+	pipelineStart := time.Now()
+	defer func() {
+		p.Runtime = time.Since(pipelineStart)
+	}()
 
 	for i := range stageMutexes {
 		stageMutexes[i] = &sync.Mutex{}
@@ -150,6 +156,8 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 				}
 				containerId := resp.ID
 
+				stageStart := time.Now()
+
 				err = c.ContainerStart(context.Background(), containerId,
 					types.ContainerStartOptions{})
 
@@ -163,6 +171,7 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 					e <- errors.Wrap(err, "Failed to wait for container to finish")
 					return
 				}
+				stage.Runtime = time.Since(stageStart)
 
 			}
 
@@ -197,7 +206,7 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 				return
 			}
 
-			fmt.Println(stage.Name, "completed successfully.")
+			fmt.Println("Stage", stage.Name, "completed successfully in", stage.Runtime)
 
 			e <- nil
 		}(i, stage)
@@ -454,8 +463,12 @@ func main() {
 	fmt.Println("All stages completed successfully.", "\nOutput written to ",
 		hostpath)
 
+	fmt.Println("Pipeline completed in:", p.Runtime)
+
 	for _, stage := range p.Stages {
-		fmt.Println(stage.Version)
+		if stage.Version != "" {
+			fmt.Println(stage.Version)
+		}
 	}
 
 	err = p.WritePipelineDescription(*outputDir + "/" + *configFilename)
