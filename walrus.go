@@ -30,9 +30,15 @@ var completedStages []bool
 var stageIndex map[string]int
 
 func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) error {
+
 	stageMutexes = make([]*sync.Mutex, len(p.Stages))
 	completedConditions = make([]*sync.Cond, len(p.Stages))
 	completedStages = make([]bool, len(p.Stages))
+
+	pipelineStart := time.Now()
+	defer func() {
+		p.Runtime = time.Since(pipelineStart)
+	}()
 
 	for i := range stageMutexes {
 		stageMutexes[i] = &sync.Mutex{}
@@ -50,8 +56,13 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 
 	for i, stage := range p.Stages {
 		go func(i int, stage *pipeline.Stage) {
-			mountpath := "/walrus/" + stage.Name
-			hostpath := rootpath + "/" + stage.Name
+
+			// Even if might be a parallel stage we only use the first part of
+			// the name
+			stageName := strings.Split(stage.Name, "_")[0]
+
+			mountpath := "/walrus/" + stageName
+			hostpath := rootpath + "/" + stageName
 
 			repo, tag := getRepoAndTag(stage.Image)
 			image := repo + ":" + tag
@@ -70,12 +81,15 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 			}
 
 			// If the stage has any inputs it waits for these stages to complete
-			// before starting
+			// before starting.
+
 			if len(stage.Inputs) > 0 {
 				for _, input := range stage.Inputs {
+
 					index := stageIndex[input]
 					cond := completedConditions[index]
 					cond.L.Lock()
+
 					for !completedStages[index] {
 						cond.Wait()
 					}
@@ -142,6 +156,8 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 				}
 				containerId := resp.ID
 
+				stageStart := time.Now()
+
 				err = c.ContainerStart(context.Background(), containerId,
 					types.ContainerStartOptions{})
 
@@ -155,6 +171,7 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 					e <- errors.Wrap(err, "Failed to wait for container to finish")
 					return
 				}
+				stage.Runtime = time.Since(stageStart)
 
 			}
 
@@ -189,7 +206,7 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 				return
 			}
 
-			fmt.Println(stage.Name, "completed successfully.")
+			fmt.Println("Stage", stage.Name, "completed successfully in", stage.Runtime)
 
 			e <- nil
 		}(i, stage)
@@ -446,8 +463,12 @@ func main() {
 	fmt.Println("All stages completed successfully.", "\nOutput written to ",
 		hostpath)
 
+	fmt.Println("Pipeline completed in:", p.Runtime)
+
 	for _, stage := range p.Stages {
-		fmt.Println(stage.Version)
+		if stage.Version != "" {
+			fmt.Println(stage.Version)
+		}
 	}
 
 	err = p.WritePipelineDescription(*outputDir + "/" + *configFilename)
