@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -28,6 +29,7 @@ var stageMutexes []*sync.Mutex
 var completedConditions []*sync.Cond
 var completedStages []bool
 var stageIndex map[string]int
+var currentUser string
 
 func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) error {
 
@@ -143,6 +145,7 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 						Env:        stage.Env,
 						Cmd:        stage.Cmd,
 						Entrypoint: stage.Entrypoint,
+						User:       currentUser,
 					},
 					&container.HostConfig{
 						Binds:       binds,
@@ -423,6 +426,12 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+
+	c, err := user.Current()
+	if err != nil {
+		fmt.Println(err)
+	}
+	currentUser = c.Uid + ":" + c.Gid
 
 	p, err := pipeline.ParseConfig(*configFilename)
 	if err != nil {
