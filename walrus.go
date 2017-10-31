@@ -153,6 +153,8 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 					&network.NetworkingConfig{},
 					stage.Name)
 
+				fmt.Println("Name:", stage.Name, "Inputs:", stage.Inputs)
+
 				if err != nil || resp.ID == " " {
 					e <- errors.Wrap(err, "Could not create container "+stage.Name)
 					return
@@ -461,6 +463,8 @@ func main() {
 			}
 		}()
 	}
+
+	fmt.Println(p)
 
 	err = run(client, p, hostpath, *configFilename)
 

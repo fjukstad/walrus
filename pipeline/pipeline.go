@@ -48,6 +48,8 @@ type Parallelism struct {
 	Constant int
 }
 
+var parallelIdentifier string = "_parallel_"
+
 func ParseConfig(filename string) (*Pipeline, error) {
 
 	file, err := ioutil.ReadFile(filename)
@@ -60,17 +62,17 @@ func ParseConfig(filename string) (*Pipeline, error) {
 		return nil, err
 	}
 
+	err = CheckNames(p)
+	if err != nil {
+		return nil, err
+	}
+
 	p, err = FindAndReplaceVariables(p, file)
 	if err != nil {
 		return nil, err
 	}
 
 	p.FixDependencies()
-
-	err = CheckNames(p)
-	if err != nil {
-		return nil, err
-	}
 
 	return &p, nil
 }
@@ -120,10 +122,10 @@ func (p Pipeline) FixDependencies() {
 	for _, stage := range p.Stages {
 		// This is a parallelized stage, we'll need to find any dependent stages
 		// and update their list of "inputs"
-		if strings.Contains(stage.Name, "_") {
+		if strings.Contains(stage.Name, parallelIdentifier) {
 
-			originalName := strings.Split(stage.Name, "_")[0]
-			parallelName := strings.Split(stage.Name, "_")[1]
+			originalName := strings.Split(stage.Name, parallelIdentifier)[0]
+			parallelName := strings.Split(stage.Name, parallelIdentifier)[1]
 
 			for _, dependentStage := range p.Stages {
 				if dependentStage.Name != stage.Name {
@@ -134,7 +136,6 @@ func (p Pipeline) FixDependencies() {
 					}
 				}
 			}
-
 		}
 	}
 }
@@ -208,7 +209,7 @@ func FindAndReplaceVariables(p Pipeline, file []byte) (Pipeline, error) {
 						var temp_stage Stage = *stage
 
 						temp_stage.Cmd = sliceReplace(temp_stage.Cmd, "{{"+variable.Name+"}}", value, -1)
-						temp_stage.Name = stage.Name + "_" + value
+						temp_stage.Name = stage.Name + "_parallel_" + value
 						temp_stage.remove = false
 
 						p.Stages = append(p.Stages, &temp_stage)
@@ -245,6 +246,10 @@ func CheckNames(p Pipeline) error {
 		if badName(stage.Name) {
 			return errors.New("Stage name: '" + stage.Name + "' should be a single word without any special characters")
 		}
+
+		if strings.Contains(stage.Name, parallelIdentifier) {
+			return errors.New("Stage name: '" + stage.Name + "' shuold not contain " + parallelIdentifier)
+		}
 	}
 	return nil
 }
@@ -259,5 +264,6 @@ func badName(name string) bool {
 	if r.MatchString(name) {
 		return true
 	}
+
 	return false
 }
