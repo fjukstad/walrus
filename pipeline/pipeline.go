@@ -123,14 +123,12 @@ func (p Pipeline) FixDependencies() {
 		// This is a parallelized stage, we'll need to find any dependent stages
 		// and update their list of "inputs"
 		if strings.Contains(stage.Name, parallelIdentifier) {
-
 			originalName := strings.Split(stage.Name, parallelIdentifier)[0]
 			parallelName := strings.Split(stage.Name, parallelIdentifier)[1]
-
 			for _, dependentStage := range p.Stages {
 				if dependentStage.Name != stage.Name {
 					if sliceContains(dependentStage.Inputs, originalName) {
-						if strings.Contains(dependentStage.Name, parallelName) {
+						if strings.HasSuffix(dependentStage.Name, parallelIdentifier+parallelName) {
 							dependentStage.Inputs = sliceReplace(dependentStage.Inputs, originalName, stage.Name, -1)
 						}
 					}
@@ -144,20 +142,25 @@ func (p Pipeline) String() string {
 	str := "Name:" + p.Name
 	str += "Stages:\n"
 	for _, stage := range p.Stages {
-		str += stage.Name + "\n"
-		str += "\t Image: " + stage.Image + "\n"
-		str += "\t Entrypoint: " + strings.Join(stage.Entrypoint, "") + "\n"
-		str += "\t Cmd: " + strings.Join(stage.Cmd, " ") + "\n"
-		str += "\t Env: " + strings.Join(stage.Env, " ") + "\n"
-		str += "\t Inputs: " + strings.Join(stage.Inputs, " ") + "\n"
-		str += "\t Volumes: " + strings.Join(stage.Volumes, " ") + "\n"
-		//str +=\t  "Parallelism:" + stage.Parallelism + "\n"
-		//str +=\t  "Cache:" + stage.Cache + "\n"
-		//str +=\t  "Mount Propagation:" + stage.MountPropagation + "\n"
-		str += "\t Comment: " + stage.Comment + "\n"
-		str += "\t Version: " + stage.Version
-		str += "\n"
+		str += stage.String()
 	}
+	return str
+}
+
+func (stage Stage) String() string {
+	str := stage.Name + "\n"
+	str += "\t Image: " + stage.Image + "\n"
+	str += "\t Entrypoint: " + strings.Join(stage.Entrypoint, "") + "\n"
+	str += "\t Cmd: " + strings.Join(stage.Cmd, " ") + "\n"
+	str += "\t Env: " + strings.Join(stage.Env, " ") + "\n"
+	str += "\t Inputs: " + strings.Join(stage.Inputs, " ") + "\n"
+	str += "\t Volumes: " + strings.Join(stage.Volumes, " ") + "\n"
+	//str +=\t  "Parallelism:" + stage.Parallelism + "\n"
+	//str +=\t  "Cache:" + stage.Cache + "\n"
+	//str +=\t  "Mount Propagation:" + stage.MountPropagation + "\n"
+	str += "\t Comment: " + stage.Comment + "\n"
+	str += "\t Version: " + stage.Version
+	str += "\n"
 	return str
 }
 

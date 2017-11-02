@@ -153,8 +153,6 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 					&network.NetworkingConfig{},
 					stage.Name)
 
-				fmt.Println("Name:", stage.Name, "Inputs:", stage.Inputs)
-
 				if err != nil || resp.ID == " " {
 					e <- errors.Wrap(err, "Could not create container "+stage.Name)
 					return
@@ -207,7 +205,7 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 			}
 
 			if exitCode != 0 {
-				e <- errors.New(stage.Name + " failed with exit code " + strconv.Itoa(exitCode) + "\n" + errmsg + "\n" + logs)
+				e <- errors.New("ERROR: Stage " + stage.Name + " failed with exit code " + strconv.Itoa(exitCode) + "\n" + stage.String() + "\n" + errmsg + "\n" + logs)
 				return
 			}
 
@@ -463,8 +461,6 @@ func main() {
 			}
 		}()
 	}
-
-	fmt.Println(p)
 
 	err = run(client, p, hostpath, *configFilename)
 
