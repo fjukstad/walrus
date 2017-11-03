@@ -118,6 +118,7 @@ func (p Pipeline) WritePipelineDescription(filename string) error {
 // both with following stages process_A and process_B. process_A will have to
 // wait for input_A, but the pipeline definition will only list `input` as a
 // dependency. This function fixes and cleans up the "dependency graph".
+// NOTE TO SELF: refactor this one jesus christ it's bad.
 func (p Pipeline) FixDependencies() {
 	for _, stage := range p.Stages {
 		// This is a parallelized stage, we'll need to find any dependent stages
@@ -130,6 +131,12 @@ func (p Pipeline) FixDependencies() {
 					if sliceContains(dependentStage.Inputs, originalName) {
 						if strings.HasSuffix(dependentStage.Name, parallelIdentifier+parallelName) {
 							dependentStage.Inputs = sliceReplace(dependentStage.Inputs, originalName, stage.Name, -1)
+						} else if !strings.Contains(dependentStage.Name, parallelIdentifier) {
+							if sliceContains(dependentStage.Inputs, parallelIdentifier) {
+								dependentStage.Inputs = append(dependentStage.Inputs, stage.Name)
+							} else {
+								dependentStage.Inputs = sliceReplace(dependentStage.Inputs, originalName, stage.Name, -1)
+							}
 						}
 					}
 				}

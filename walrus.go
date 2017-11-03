@@ -96,6 +96,8 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 			if len(stage.Inputs) > 0 {
 				for _, input := range stage.Inputs {
 
+					fmt.Println("Stage", stage.Name, "waiting for", input)
+
 					index := stageIndex[input]
 					cond := completedConditions[index]
 					cond.L.Lock()
@@ -163,6 +165,8 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 					&network.NetworkingConfig{},
 					stage.Name)
 
+				fmt.Println("Creating container", stage.Name)
+
 				if err != nil || resp.ID == " " {
 					e <- errors.Wrap(err, "Could not create container "+stage.Name)
 					return
@@ -177,7 +181,7 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 					err = c.ContainerStart(context.Background(), containerId,
 						types.ContainerStartOptions{})
 					if err != nil {
-						fmt.Println("Warning: Could not start container", stage.Name, "retrying.")
+						fmt.Println("Warning: Could not start container", stage.Name, "retrying. Error:", err)
 						if numTries > 10 {
 							e <- errors.Wrap(err, "Could not start container "+stage.Name)
 							return
