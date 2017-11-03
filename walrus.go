@@ -31,7 +31,15 @@ var completedStages []bool
 var stageIndex map[string]int
 var currentUser string
 
+var numParallelWorkers = 5
+
 func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) error {
+
+	// We use a buffered channel to limit the number of stages that can run in
+	// parallel. Every stage will signal that it starts doing work by inserting
+	// a 1 into the channel. Once it completes it will pull one number out of
+	// the channel.
+	executing := make(chan int, numParallelWorkers)
 
 	stageMutexes = make([]*sync.Mutex, len(p.Stages))
 	completedConditions = make([]*sync.Cond, len(p.Stages))
@@ -99,6 +107,8 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 				}
 			}
 
+			executing <- 1
+
 			// If the stage can be cached, check for a previous run. If this
 			// container does not exist we need to run the stage again. Also if
 			// a cached stage has failed we'll need to re run it.
@@ -161,12 +171,22 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 
 				stageStart := time.Now()
 
-				err = c.ContainerStart(context.Background(), containerId,
-					types.ContainerStartOptions{})
+				numTries := 0
 
-				if err != nil {
-					e <- errors.Wrap(err, "Could not start container "+stage.Name)
-					return
+				for {
+					err = c.ContainerStart(context.Background(), containerId,
+						types.ContainerStartOptions{})
+					if err != nil {
+						fmt.Println("Warning: Could not start container", stage.Name, "retrying.")
+						if numTries > 10 {
+							e <- errors.Wrap(err, "Could not start container "+stage.Name)
+							return
+						}
+						numTries += 1
+						time.Sleep(10 * time.Second)
+					} else {
+						break
+					}
 				}
 
 				_, err = c.ContainerWait(context.Background(), containerId)
@@ -175,6 +195,8 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 					return
 				}
 				stage.Runtime = time.Since(stageStart)
+
+				<-executing
 
 			}
 
@@ -214,12 +236,16 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 			e <- nil
 		}(i, stage)
 	}
+
 	var err error
+
 	for _, stage := range p.Stages {
+
 		err = <-e
 		if err != nil {
 			return err
 		}
+
 		if p.VersionControl {
 			hostpath := rootpath + "/" + stage.Name
 			// add and commit output data
