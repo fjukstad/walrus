@@ -1,0 +1,114 @@
+{ 
+	"Name": "nowacseq",
+    "Variables": [
+        {"Name":"project", "Values": ["gcf-2017-463"]},
+        {"Name":"transcripts", "Values": ["Homo_sapiens.GRCh38.cdna.all"]},
+        {"Name":"sample", "Values": [ "1_L001_R1", "2_L001_R1", "3_L001_R1",
+            "4_L001_R1", "5_L001_R1", "6_L001_R1", "7_L001_R1", "8_L001_R1",
+            "9_L001_R1", "10_L001_R1", "11_L001_R1", "12_L001_R1", "13_L001_R1",
+            "14_L001_R1", "15_L001_R1", "16_L001_R1", "17_L001_R1",
+            "18_L001_R1", "19_L001_R1", "20_L001_R1", "21_L001_R1",
+            "22_L001_R1", "23_L001_R1", "24_L001_R1", "25_L001_R1",
+            "26_L001_R1", "27_L001_R1", "28_L001_R1", "29_L001_R1",
+            "30_L001_R1", "31_L001_R1", "32_L001_R1", "33_L001_R1",
+            "34_L001_R1", "35_L001_R1", "36_L001_R1", "37_L001_R1",
+            "38_L001_R1", "39_L001_R1", "40_L001_R1", "41_L001_R1",
+            "42_L001_R1", "43_L001_R1", "44_L001_R1", "45_L001_R1",
+            "46_L001_R1", "47_L001_R1", "48_L001_R1", "49_L001_R1",
+            "50_L001_R1", "51_L001_R1", "52_L001_R1", "53_L001_R1",
+            "54_L001_R1", "55_L001_R1", "56_L001_R1", "57_L001_R1",
+            "58_L001_R1", "59_L001_R1", "60_L001_R1", "61_L001_R1",
+            "62_L001_R1", "63_L001_R1", "64_L001_R1", "65_L001_R1",
+            "66_L001_R1", "68_L001_R1", "69_L001_R1", "70_L001_R1",
+            "71_L001_R1", "72_L001_R1", "73_L001_R1", "74_L001_R1",
+            "75_L001_R1", "76_L001_R1", "77_L001_R1", "78_L001_R1",
+            "79_L001_R1", "80_L001_R1", "81_L001_R1", "83_L001_R1",
+            "84_L001_R1", "85_L001_R1", "87_L001_R1", "88_L001_R1",
+            "89_L001_R1", "90_L001_R1" ]}        
+    ],
+	"Stages": [
+		{
+			"Name":"input",
+			"Image": "fjukstad/seqbase",
+		        "Cmd": [
+				"sh", "-c",
+				"cp /data/{{project}}.7z /data/TruSeq3-SE.fa /data/{{transcripts}}.fa.gz /data/targets.csv /data/tximport-analysis.R /walrus/input/"
+		    ],
+            "Volumes": ["data:/data"],
+            "Comment": "Transcripts from https://www.biostars.org/p/257180/"
+		},
+        {
+			"Name":"extract",
+			"Image": "fjukstad/seqbase",
+		        "Cmd": [
+				"sh", "-c",
+				"unzip -u -d /walrus/extract/ /walrus/input/{{project}}.7z"
+		    ],
+             "Inputs" : ["input"]
+		},
+
+        {
+            "Name": "fastqc",
+            "Image": "fjukstad/fastqc",
+            "Cmd":[
+                "/walrus/extract/fastq/samples/BFCFV/{{sample}}.fastq.gz",
+                "--outdir=/walrus/fastqc"
+            ],
+             "Inputs" : ["extract"]
+        },
+        {
+            "Name": "trimoriginal",
+            "Image": "fjukstad/trimmomatic",
+            "Cmd":["SE","-threads","10", "-phred33",
+                "/walrus/extract/fastq/samples/BFCFV/{{sample}}.fastq.gz",
+                "/walrus/trimoriginal/{{sample}}.fastq.gz",
+                "ILLUMINACLIP:/walrus/input/TruSeq3-SE.fa:2:30:10",
+                "TRAILING:30",
+                "LEADING:30",
+                "CROP:100"
+            ],
+             "Inputs" : ["extract"]
+        },
+        {
+            "Name": "fastqctrimmed",
+            "Image": "fjukstad/fastqc",
+            "Cmd":[
+                "/walrus/trimoriginal/{{sample}}.fastq.gz",
+                "--outdir=/walrus/fastqctrimmed"
+            ],
+             "Inputs" : ["trimoriginal"]
+        },
+        {
+            "Name": "salmonindex",
+            "Image": "fjukstad/salmon",
+            "Cmd":[
+                "index", "-t",
+                "/walrus/input/{{transcripts}}.fa.gz",
+                "-i",
+                "/walrus/salmonindex/index"
+                            ],
+             "Inputs" : ["input"]
+        },
+        {
+            "Name": "salmonquant",
+            "Image": "fjukstad/salmon",
+            "Cmd":[
+                "quant", "-i", "/walrus/salmonindex/index", "-l", "A",
+                "-p", "8", 
+                "-r", 
+                "/walrus/trimoriginal/{{sample}}.fastq.gz",
+                "-o", "/walrus/salmonquant/{{sample}}"
+            ],
+             "Inputs" : ["trimoriginal", "salmonindex"]
+        },
+        {
+            "Name": "tximport",
+            "Image": "fjukstad/tximport",
+            "Cmd":[
+                "R",
+                "-f", "/walrus/input/tximport-analysis.R"
+            ],
+             "Inputs" : ["salmonquant"]
+        }
+	]
+}
