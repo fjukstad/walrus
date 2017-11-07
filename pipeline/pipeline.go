@@ -48,6 +48,8 @@ type Parallelism struct {
 	Constant int
 }
 
+var parallelIdentifier string = "_parallel_"
+
 func ParseConfig(filename string) (*Pipeline, error) {
 
 	file, err := ioutil.ReadFile(filename)
@@ -60,17 +62,17 @@ func ParseConfig(filename string) (*Pipeline, error) {
 		return nil, err
 	}
 
+	err = CheckNames(p)
+	if err != nil {
+		return nil, err
+	}
+
 	p, err = FindAndReplaceVariables(p, file)
 	if err != nil {
 		return nil, err
 	}
 
 	p.FixDependencies()
-
-	err = CheckNames(p)
-	if err != nil {
-		return nil, err
-	}
 
 	return &p, nil
 }
@@ -116,25 +118,29 @@ func (p Pipeline) WritePipelineDescription(filename string) error {
 // both with following stages process_A and process_B. process_A will have to
 // wait for input_A, but the pipeline definition will only list `input` as a
 // dependency. This function fixes and cleans up the "dependency graph".
+// NOTE TO SELF: refactor this one jesus christ it's bad.
 func (p Pipeline) FixDependencies() {
 	for _, stage := range p.Stages {
 		// This is a parallelized stage, we'll need to find any dependent stages
 		// and update their list of "inputs"
-		if strings.Contains(stage.Name, "_") {
-
-			originalName := strings.Split(stage.Name, "_")[0]
-			parallelName := strings.Split(stage.Name, "_")[1]
-
+		if strings.Contains(stage.Name, parallelIdentifier) {
+			originalName := strings.Split(stage.Name, parallelIdentifier)[0]
+			parallelName := strings.Split(stage.Name, parallelIdentifier)[1]
 			for _, dependentStage := range p.Stages {
 				if dependentStage.Name != stage.Name {
 					if sliceContains(dependentStage.Inputs, originalName) {
-						if strings.Contains(dependentStage.Name, parallelName) {
+						if strings.HasSuffix(dependentStage.Name, parallelIdentifier+parallelName) {
 							dependentStage.Inputs = sliceReplace(dependentStage.Inputs, originalName, stage.Name, -1)
+						} else if !strings.Contains(dependentStage.Name, parallelIdentifier) {
+							if sliceContains(dependentStage.Inputs, parallelIdentifier) {
+								dependentStage.Inputs = append(dependentStage.Inputs, stage.Name)
+							} else {
+								dependentStage.Inputs = sliceReplace(dependentStage.Inputs, originalName, stage.Name, -1)
+							}
 						}
 					}
 				}
 			}
-
 		}
 	}
 }
@@ -143,20 +149,25 @@ func (p Pipeline) String() string {
 	str := "Name:" + p.Name
 	str += "Stages:\n"
 	for _, stage := range p.Stages {
-		str += stage.Name + "\n"
-		str += "\t Image: " + stage.Image + "\n"
-		str += "\t Entrypoint: " + strings.Join(stage.Entrypoint, "") + "\n"
-		str += "\t Cmd: " + strings.Join(stage.Cmd, " ") + "\n"
-		str += "\t Env: " + strings.Join(stage.Env, " ") + "\n"
-		str += "\t Inputs: " + strings.Join(stage.Inputs, " ") + "\n"
-		str += "\t Volumes: " + strings.Join(stage.Volumes, " ") + "\n"
-		//str +=\t  "Parallelism:" + stage.Parallelism + "\n"
-		//str +=\t  "Cache:" + stage.Cache + "\n"
-		//str +=\t  "Mount Propagation:" + stage.MountPropagation + "\n"
-		str += "\t Comment: " + stage.Comment + "\n"
-		str += "\t Version: " + stage.Version
-		str += "\n"
+		str += stage.String()
 	}
+	return str
+}
+
+func (stage Stage) String() string {
+	str := stage.Name + "\n"
+	str += "\t Image: " + stage.Image + "\n"
+	str += "\t Entrypoint: " + strings.Join(stage.Entrypoint, "") + "\n"
+	str += "\t Cmd: " + strings.Join(stage.Cmd, " ") + "\n"
+	str += "\t Env: " + strings.Join(stage.Env, " ") + "\n"
+	str += "\t Inputs: " + strings.Join(stage.Inputs, " ") + "\n"
+	str += "\t Volumes: " + strings.Join(stage.Volumes, " ") + "\n"
+	//str +=\t  "Parallelism:" + stage.Parallelism + "\n"
+	//str +=\t  "Cache:" + stage.Cache + "\n"
+	//str +=\t  "Mount Propagation:" + stage.MountPropagation + "\n"
+	str += "\t Comment: " + stage.Comment + "\n"
+	str += "\t Version: " + stage.Version
+	str += "\n"
 	return str
 }
 
@@ -208,7 +219,7 @@ func FindAndReplaceVariables(p Pipeline, file []byte) (Pipeline, error) {
 						var temp_stage Stage = *stage
 
 						temp_stage.Cmd = sliceReplace(temp_stage.Cmd, "{{"+variable.Name+"}}", value, -1)
-						temp_stage.Name = stage.Name + "_" + value
+						temp_stage.Name = stage.Name + "_parallel_" + value
 						temp_stage.remove = false
 
 						p.Stages = append(p.Stages, &temp_stage)
@@ -245,6 +256,10 @@ func CheckNames(p Pipeline) error {
 		if badName(stage.Name) {
 			return errors.New("Stage name: '" + stage.Name + "' should be a single word without any special characters")
 		}
+
+		if strings.Contains(stage.Name, parallelIdentifier) {
+			return errors.New("Stage name: '" + stage.Name + "' shuold not contain " + parallelIdentifier)
+		}
 	}
 	return nil
 }
@@ -259,5 +274,6 @@ func badName(name string) bool {
 	if r.MatchString(name) {
 		return true
 	}
+
 	return false
 }

@@ -133,8 +133,6 @@ func Add(path string) (changes bool, repositoryLocation string, err error) {
 		return nil
 	})
 
-	fmt.Println("CHANGED:", changed)
-
 	if err != nil {
 		return false, "", err
 	}
