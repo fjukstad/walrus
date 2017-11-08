@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	wcontainer "github.com/fjukstad/walrus/container"
 	"github.com/fjukstad/walrus/lfs"
 	"github.com/fjukstad/walrus/pipeline"
 
@@ -30,6 +31,7 @@ var completedConditions []*sync.Cond
 var completedStages []bool
 var stageIndex map[string]int
 var currentUser string
+var profile *bool
 
 var numParallelWorkers = 5
 
@@ -172,6 +174,10 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 
 				numTries := 0
 
+				if *profile {
+					go wcontainer.Profile(c, containerId, hostpath+"/profile-"+stage.Name+".json")
+				}
+
 				for {
 					err = c.ContainerStart(context.Background(), containerId,
 						types.ContainerStartOptions{})
@@ -188,11 +194,17 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 					}
 				}
 
-				_, err = c.ContainerWait(context.Background(), containerId)
-				if err != nil {
-					e <- errors.Wrap(err, "Failed to wait for container to finish")
-					return
+				okC, errC := c.ContainerWait(context.Background(), containerId,
+					container.WaitConditionNotRunning)
+				select {
+				case err := <-errC:
+					if err != nil {
+						e <- errors.Wrap(err, "Failed to wait for container to finish")
+						return
+					}
+				case <-okC: // simply drain wait ok channel
 				}
+
 				stage.Runtime = time.Since(stageStart)
 
 				<-executing
@@ -401,14 +413,23 @@ func fixMountPaths(stages []*pipeline.Stage) error {
 }
 
 func main() {
-	var configFilename = flag.String("i", "pipeline.json", "pipeline description file")
-	var outputDir = flag.String("o", "walrus", "where walrus should store output data on the host")
-	var web = flag.Bool("web", false, "host interactive visualization of the pipeline")
-	var port = flag.String("p", ":9090", "port to run web server for pipeline visualization")
-	var lfsServer = flag.Bool("lfs-server", false, "start an lfs-server, will not run the pipeline")
-	var lfsDir = flag.String("lfs-server-dir", "lfs", "host directory to store lfs objects")
-	var versionControl = flag.Bool("version-control", true, "version control output data automatically")
+	var configFilename = flag.String("i", "pipeline.json",
+		"pipeline description file")
+	var outputDir = flag.String("o", "walrus",
+		"where walrus should store output data on the host")
+	var web = flag.Bool("web", false,
+		"host interactive visualization of the pipeline")
+	var port = flag.String("p", ":9090",
+		"port to run web server for pipeline visualization")
+	var lfsServer = flag.Bool("lfs-server", false,
+		"start an lfs-server, will not run the pipeline")
+	var lfsDir = flag.String("lfs-server-dir", "lfs",
+		"host directory to store lfs objects")
+	var versionControl = flag.Bool("version-control", true,
+		"version control output data automatically")
 	var logs = flag.String("logs", "", "get logs for pipeline stage")
+
+	profile = flag.Bool("profile", false, "collect runtime metrics for the pipeline stages")
 
 	flag.Parse()
 
