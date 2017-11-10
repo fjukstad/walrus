@@ -257,7 +257,7 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 			return err
 		}
 
-		if p.VersionControl {
+		if p.Commit {
 			hostpath := rootpath + "/" + stage.Name
 			// add and commit output data
 			msg := "Add data pipeline stage: " + stage.Name
@@ -423,10 +423,9 @@ func main() {
 		"port to run web server for pipeline visualization")
 	var lfsServer = flag.Bool("lfs-server", false,
 		"start an lfs-server, will not run the pipeline")
-	var lfsDir = flag.String("lfs-server-dir", "lfs",
+	var lfsServerDir = flag.String("lfs-server-dir", "lfs",
 		"host directory to store lfs objects")
-	var versionControl = flag.Bool("version-control", true,
-		"version control output data automatically")
+	var commit = flag.Bool("commit", false, "add and commit output data")
 	var logs = flag.String("logs", "", "get logs for pipeline stage")
 
 	profile = flag.Bool("profile", false, "collect runtime metrics for the pipeline stages")
@@ -434,7 +433,7 @@ func main() {
 	flag.Parse()
 
 	if *lfsServer {
-		err := lfs.StartServer(*lfsDir)
+		err := lfs.StartServer(*lfsServerDir)
 		if err != nil {
 			fmt.Println("Could not start git-lfs server", err)
 		} else {
@@ -485,7 +484,7 @@ func main() {
 		return
 	}
 
-	p.VersionControl = *versionControl
+	p.Commit = *commit
 
 	err = fixMountPaths(p.Stages)
 	if err != nil {
