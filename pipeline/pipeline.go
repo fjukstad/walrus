@@ -96,13 +96,21 @@ func (p Pipeline) FixDependencies() {
 			parallelName := strings.Split(stage.Name, parallelIdentifier)[1]
 			for _, dependentStage := range p.Stages {
 				if dependentStage.Name != stage.Name {
+					// Stage has parallel stage as a dependency
 					if sliceContains(dependentStage.Inputs, originalName) {
+						// Dependent stage is itself a parallel stage. Find and
+						// replace all occurences of the 'non-parallel' name
+						// with the newly updated one
 						if strings.HasSuffix(dependentStage.Name, parallelIdentifier+parallelName) {
-							dependentStage.Inputs = sliceReplace(dependentStage.Inputs, originalName, stage.Name, -1)
+							dependentStage.Inputs = sliceReplaceMatching(dependentStage.Inputs, originalName, stage.Name, -1)
 						} else if !strings.Contains(dependentStage.Name, parallelIdentifier) {
+							// If dependent stage has any parallel stages as
+							// input, add the stage to this list.
 							if sliceContains(dependentStage.Inputs, parallelIdentifier) {
 								dependentStage.Inputs = append(dependentStage.Inputs, stage.Name)
 							} else {
+								// if not find and replace all matching
+								// 'non-parallel' names with new parallelized one
 								dependentStage.Inputs = sliceReplace(dependentStage.Inputs, originalName, stage.Name, -1)
 							}
 						}
@@ -169,6 +177,19 @@ func sliceReplace(s []string, old, new string, n int) []string {
 		replaced = append(replaced, strings.Replace(str, old, new, n))
 	}
 	return replaced
+}
+
+func sliceReplaceMatching(s []string, old, new string, n int) []string {
+	var replaced []string
+	for _, str := range s {
+		if old == str {
+			replaced = append(replaced, strings.Replace(str, old, new, n))
+		} else {
+			replaced = append(replaced, str)
+		}
+	}
+	return replaced
+
 }
 
 // Finds and replaces all variable names with their respective single values. On
