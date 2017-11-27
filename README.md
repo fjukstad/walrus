@@ -1,3 +1,5 @@
+![walrus](misc/walrus-200x200.png)
+
 # Walrus
 Walrus is a small tool I built to run data analysis pipelines using Docker
 containers. It is very simple: Walrus reads a pipeline description from either a
