@@ -1,9 +1,11 @@
 ![walrus](misc/walrus-200x200.png)
 
-# Walrus
-Walrus is a small tool I built to run data analysis pipelines using Docker
-containers. It is very simple: Walrus reads a pipeline description from either a
-JSON or YAML file and starts Docker containers as described in this file. 
+# walrus
+walrus is a small tool for executing data analysis pipelines using Docker
+containers. It is very simple: walrus reads a pipeline description from either a
+JSON or YAML file and starts Docker containers as described in this file. We
+have used walrus to develop analysis pipelines for analyzing whome-exome as well
+as RNA sequencing datasets. 
 
 # Pipeline 
 A pipeline has a *name*, a list of *pipeline stages*, optional
@@ -17,7 +19,7 @@ a *command* it runs on start up.
 ## IO
 Each pipeline stage should write any output data to the directory
 `/walrus/STAGENAME` that is automatically mounted onside the docker container
-on start-up. Walrus automatically mounts input directories from its dependencies
+on start-up. walrus automatically mounts input directories from its dependencies
 on start-up at `/walrus/INPUT_STAGENAME`. The user specifies where this
 `/walrus` directory is on the host OS by using the `-output` command line flag
 (see Usage for more information).
@@ -45,7 +47,7 @@ pipeline descriptions. This will ensure that you can keep track of the different
 parameters to the different tools as you develop your analysis pipeline.
 
 ## Data
-Walrus automatically tracks data in the pipeline with
+walrus automatically tracks data in the pipeline with
 [git-lfs](https://git-lfs.github.com/). When users start a pipeline walrus will
 track any output data from any of the pipeline stages and commit them to the
 repository versioning the pipeline description, If you do not have a repository
