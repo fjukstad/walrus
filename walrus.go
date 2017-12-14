@@ -188,14 +188,17 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 					}
 				}
 
-				_, err = c.ContainerWait(context.Background(), containerId)
-				if err != nil {
-					e <- errors.Wrap(err, "Failed to wait for container to finish")
-					return
+				okCh, errCh := c.ContainerWait(context.Background(), containerId, container.WaitConditionNotRunning)
+				select {
+				case err := <-errCh:
+					if err != nil {
+						e <- errors.Wrap(err, "Failed to wait for container to finish")
+						return
+					}
+				case <-okCh:
+					stage.Runtime = time.Since(stageStart)
+					<-executing
 				}
-				stage.Runtime = time.Since(stageStart)
-
-				<-executing
 
 			}
 
