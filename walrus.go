@@ -409,6 +409,7 @@ func main() {
 	var lfsDir = flag.String("lfs-server-dir", "lfs", "host directory to store lfs objects")
 	var versionControl = flag.Bool("version-control", true, "version control output data automatically")
 	var logs = flag.String("logs", "", "get logs for pipeline stage")
+	var graphFilename = flag.String("graph", "", "write dot graph of the pipeline to the given filename and stop.")
 
 	flag.Parse()
 
@@ -475,6 +476,16 @@ func main() {
 	err = stopPreviousRun(client, p.Stages)
 	if err != nil {
 		fmt.Println(err)
+		return
+	}
+
+	if *graphFilename != "" {
+		err = p.WriteDOT(*graphFilename)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		fmt.Println("DOT graph of the pipeline was written to:", *graphFilename)
 		return
 	}
 
