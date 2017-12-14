@@ -66,8 +66,8 @@ func (p *Pipeline) createGraph() graph.Directed {
 
 	for _, stage := range p.Stages {
 		for _, input := range stage.Inputs {
-			f := Node{stage.Name}
-			t := Node{input}
+			t := Node{stage.Name}
+			f := Node{input}
 			e := Edge{f, t, 0}
 			graph.SetEdge(e)
 		}
