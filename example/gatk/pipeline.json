@@ -1,9 +1,9 @@
 { 
     "Name" : "gatkexample" ,
     "Variables": [
-        { "Name": "sample" , "Value":"example"},
-        { "Name": "sampleBAM" , "Value":"exampleBAM.bam"},
-        { "Name": "sampleFASTA", "Value":"exampleFASTA.fasta"}
+        { "Name": "sample" , "Values":["example"]},
+        { "Name": "sampleBAM" , "Values":["exampleBAM.bam"]},
+        { "Name": "sampleFASTA", "Values":["exampleFASTA.fasta"]}
     ],
     "Stages": [
             {
