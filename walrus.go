@@ -76,18 +76,37 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 
 			repo, tag := getRepoAndTag(stage.Image)
 			image := repo + ":" + tag
-			rc, err := c.ImagePull(context.Background(), image,
-				types.ImagePullOptions{})
+
+			images, err := c.ImageList(context.Background(), types.ImageListOptions{})
 			if err != nil {
-				e <- errors.Wrap(err, "Could not pull image")
+				e <- errors.Wrap(err, "Could not list images")
 				return
 			}
 
-			defer rc.Close()
+			// Check if Docker image is present on the host. If not pull it
+			// down.
+			imagePresent := false
+			for _, img := range images {
+				for _, tag := range img.RepoTags {
+					if image == tag {
+						imagePresent = true
+					}
+				}
+			}
+			if !imagePresent {
+				rc, err := c.ImagePull(context.Background(), image,
+					types.ImagePullOptions{})
+				if err != nil {
+					e <- errors.Wrap(err, "Could not pull image")
+					return
+				}
 
-			_, err = ioutil.ReadAll(rc)
-			if err != nil {
-				e <- errors.Wrap(err, "error reading image pull")
+				defer rc.Close()
+
+				_, err = ioutil.ReadAll(rc)
+				if err != nil {
+					e <- errors.Wrap(err, "error reading image pull")
+				}
 			}
 
 			// If the stage has any inputs it waits for these stages to complete
