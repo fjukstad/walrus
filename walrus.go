@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -111,13 +111,11 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 
 			// If the stage has any inputs it waits for these stages to complete
 			// before starting.
-
 			if len(stage.Inputs) > 0 {
 				for _, input := range stage.Inputs {
 					index := stageIndex[input]
 					cond := completedConditions[index]
 					cond.L.Lock()
-
 					for !completedStages[index] {
 						cond.Wait()
 					}
@@ -134,8 +132,8 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 			if stage.Cache {
 				code, _, err := exitCode(c, stage.Name)
 				if err != nil {
-					fmt.Println(err)
-					fmt.Println("Warning: Could not find cached container", stage.Name, "will re-run the stage")
+					log.Println(err)
+					log.Println("Warning: Could not find cached container", stage.Name, "will re-run the stage")
 					stage.Cache = false
 				}
 				if code != 0 {
@@ -196,7 +194,7 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 					err = c.ContainerStart(context.Background(), containerId,
 						types.ContainerStartOptions{})
 					if err != nil {
-						fmt.Println("Warning: Could not start container", stage.Name, "retrying. Error:", err)
+						log.Println("Warning: Could not start container", stage.Name, "retrying. Error:", err)
 						if numTries > 10 {
 							e <- errors.Wrap(err, "Could not start container "+stage.Name)
 							return
@@ -255,7 +253,7 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 				return
 			}
 
-			fmt.Println("Stage", stage.Name, "completed successfully in", stage.Runtime)
+			log.Println("Stage", stage.Name, "completed successfully in", stage.Runtime)
 
 			e <- nil
 		}(i, stage)
@@ -277,7 +275,7 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 			commitId, err := lfs.AddAndCommitData(hostpath, msg)
 			if err != nil {
 				e <- errors.Wrap(err, "Could not commit output data "+stage.Name)
-				fmt.Println(err)
+				log.Println(err)
 			}
 			stage.Version = commitId
 		}
@@ -441,9 +439,9 @@ func main() {
 	if *lfsServer {
 		err := lfs.StartServer(*lfsDir)
 		if err != nil {
-			fmt.Println("Could not start git-lfs server", err)
+			log.Println("Could not start git-lfs server", err)
 		} else {
-			fmt.Println("git-lfs server started successfully")
+			log.Println("git-lfs server started successfully")
 		}
 		return
 	}
@@ -453,11 +451,11 @@ func main() {
 		filename := *outputDir + "/" + stageName + "/walrus.log"
 		b, err := ioutil.ReadFile(filename)
 		if err != nil {
-			fmt.Println("Could not read logs for stage: " + stageName)
-			fmt.Println(err)
+			log.Println("Could not read logs for stage: " + stageName)
+			log.Println(err)
 			return
 		}
-		fmt.Println(string(b))
+		log.Println(string(b))
 		return
 	}
 
@@ -468,25 +466,25 @@ func main() {
 
 	hostpath, err := filepath.Abs(*outputDir)
 	if err != nil {
-		fmt.Println("Check hostpath", err)
+		log.Println("Check hostpath", err)
 		return
 	}
 
 	client, err := client.NewEnvClient()
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 
 	c, err := user.Current()
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	currentUser = c.Uid + ":" + c.Gid
 
 	p, err := pipeline.ParseConfig(*configFilename)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 
@@ -494,23 +492,23 @@ func main() {
 
 	err = fixMountPaths(p.Stages)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 
 	err = stopPreviousRun(client, p.Stages)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 
 	if *graphFilename != "" {
 		err = p.WriteDOT(*graphFilename)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return
 		}
-		fmt.Println("DOT graph of the pipeline was written to:", *graphFilename)
+		log.Println("DOT graph of the pipeline was written to:", *graphFilename)
 		return
 	}
 
@@ -518,7 +516,7 @@ func main() {
 		go func() {
 			err = startPipelineVisualization(p, *port)
 			if err != nil {
-				fmt.Println("Could not start pipeline visualization:", err)
+				log.Println("Could not start pipeline visualization:", err)
 			}
 		}()
 	}
@@ -526,24 +524,24 @@ func main() {
 	err = run(client, p, hostpath, *configFilename)
 
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 
-	fmt.Println("All stages completed successfully.", "\nOutput written to ",
+	log.Println("All stages completed successfully.", "\nOutput written to ",
 		hostpath)
 
-	fmt.Println("Pipeline completed in:", p.Runtime)
+	log.Println("Pipeline completed in:", p.Runtime)
 
 	for _, stage := range p.Stages {
 		if stage.Version != "" {
-			fmt.Println(stage.Version)
+			log.Println(stage.Version)
 		}
 	}
 
 	err = p.WritePipelineDescription(*outputDir + "/" + *configFilename)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 	return
