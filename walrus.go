@@ -125,6 +125,7 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 				}
 			}
 
+			// Requesting 'ticket' in workerpool.
 			executing <- 1
 
 			// If the stage can be cached, check for a previous run. If this
@@ -216,10 +217,12 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 					}
 				case <-okCh:
 					stage.Runtime = time.Since(stageStart)
-					<-executing
 				}
 
 			}
+
+			// Done executing, release ticket in worker pool.
+			<-executing
 
 			cond := completedConditions[i]
 			cond.L.Lock()
@@ -227,8 +230,8 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 			// Notifies waiting stages on completion
 			completedStages[i] = true
 
-			cond.Broadcast()
 			cond.L.Unlock()
+			cond.Broadcast()
 
 			exitCode, errmsg, err := exitCode(c, stage.Name)
 			if err != nil {
