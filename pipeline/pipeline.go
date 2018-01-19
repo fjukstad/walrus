@@ -7,49 +7,15 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
 	"gopkg.in/yaml.v2"
 )
 
-type Pipeline struct {
-	Name           string
-	Stages         []*Stage
-	Comment        string
-	Variables      []Variable
-	VersionControl bool
-	Runtime        time.Duration
-}
-
-type Variable struct {
-	Name   string
-	Values []string
-}
-
-type Stage struct {
-	Name             string
-	Image            string
-	Entrypoint       []string
-	Cmd              []string
-	Env              []string
-	Inputs           []string
-	Volumes          []string
-	Parallelism      Parallelism
-	Cache            bool
-	Comment          string
-	MountPropagation string
-	Version          string
-	remove           bool
-	Runtime          time.Duration
-}
-
-type Parallelism struct {
-	Strategy string
-	Constant int
-}
-
 var parallelIdentifier string = "_parallel_"
 
+// Parses the pipeline configuration and returns the pipeline. It will verify
+// that names are valid, find and replace variable names and create parallel
+// pipeline stages.
 func ParseConfig(filename string) (*Pipeline, error) {
 
 	file, err := ioutil.ReadFile(filename)
@@ -77,6 +43,7 @@ func ParseConfig(filename string) (*Pipeline, error) {
 	return &p, nil
 }
 
+// Read a pipeline description.
 func ReadPipelineDescription(file []byte, filename string) (Pipeline, error) {
 	p := Pipeline{}
 	var err error
@@ -94,6 +61,7 @@ func ReadPipelineDescription(file []byte, filename string) (Pipeline, error) {
 	return p, err
 }
 
+// Write a pipeline description to a file.
 func (p Pipeline) WritePipelineDescription(filename string) error {
 	var b []byte
 	var err error
@@ -128,13 +96,21 @@ func (p Pipeline) FixDependencies() {
 			parallelName := strings.Split(stage.Name, parallelIdentifier)[1]
 			for _, dependentStage := range p.Stages {
 				if dependentStage.Name != stage.Name {
+					// Stage has parallel stage as a dependency
 					if sliceContains(dependentStage.Inputs, originalName) {
+						// Dependent stage is itself a parallel stage. Find and
+						// replace all occurences of the 'non-parallel' name
+						// with the newly updated one
 						if strings.HasSuffix(dependentStage.Name, parallelIdentifier+parallelName) {
-							dependentStage.Inputs = sliceReplace(dependentStage.Inputs, originalName, stage.Name, -1)
+							dependentStage.Inputs = sliceReplaceMatching(dependentStage.Inputs, originalName, stage.Name, -1)
 						} else if !strings.Contains(dependentStage.Name, parallelIdentifier) {
+							// If dependent stage has any parallel stages as
+							// input, add the stage to this list.
 							if sliceContains(dependentStage.Inputs, parallelIdentifier) {
 								dependentStage.Inputs = append(dependentStage.Inputs, stage.Name)
 							} else {
+								// if not find and replace all matching
+								// 'non-parallel' names with new parallelized one
 								dependentStage.Inputs = sliceReplace(dependentStage.Inputs, originalName, stage.Name, -1)
 							}
 						}
@@ -145,6 +121,7 @@ func (p Pipeline) FixDependencies() {
 	}
 }
 
+// Stringify a pipeline description.
 func (p Pipeline) String() string {
 	str := "Name:" + p.Name
 	str += "Stages:\n"
@@ -154,6 +131,7 @@ func (p Pipeline) String() string {
 	return str
 }
 
+// Stringify a pipeline stage.
 func (stage Stage) String() string {
 	str := stage.Name + "\n"
 	str += "\t Image: " + stage.Image + "\n"
@@ -171,6 +149,7 @@ func (stage Stage) String() string {
 	return str
 }
 
+// Checks if a string maches an item within a slice.
 func inSlice(s []string, substr string) bool {
 	for _, str := range s {
 		if str == substr {
@@ -180,6 +159,7 @@ func inSlice(s []string, substr string) bool {
 	return false
 }
 
+// Checks if items in a slice contain a specific string.
 func sliceContains(s []string, substr string) bool {
 	for _, str := range s {
 		if strings.Contains(str, substr) {
@@ -197,6 +177,19 @@ func sliceReplace(s []string, old, new string, n int) []string {
 		replaced = append(replaced, strings.Replace(str, old, new, n))
 	}
 	return replaced
+}
+
+func sliceReplaceMatching(s []string, old, new string, n int) []string {
+	var replaced []string
+	for _, str := range s {
+		if old == str {
+			replaced = append(replaced, strings.Replace(str, old, new, n))
+		} else {
+			replaced = append(replaced, str)
+		}
+	}
+	return replaced
+
 }
 
 // Finds and replaces all variable names with their respective single values. On
@@ -247,6 +240,7 @@ func FindAndReplaceVariables(p Pipeline, file []byte) (Pipeline, error) {
 	return p, nil
 }
 
+// Verify that the pipeline name and pipeline stage names are valid.
 func CheckNames(p Pipeline) error {
 	if badName(p.Name) {
 		return errors.New("Pipeline name: '" + p.Name + "' should be a single word without any special characters")

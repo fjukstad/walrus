@@ -147,6 +147,7 @@ func Add(path string) (changes bool, repositoryLocation string, err error) {
 
 }
 
+// Add a path to the index.
 func addToIndex(repo *git.Repository, path string) error {
 
 	index, err := repo.Index()
@@ -172,7 +173,7 @@ func addToIndex(repo *git.Repository, path string) error {
 	return err
 }
 
-// Removes the last directory in a path and returns it
+// Removes the last directory in a path and returns it.
 func popLastDirectory(path string) string {
 
 	// split the path into a list of dirs /a/b/c --> [a,b,c] then remove
@@ -183,7 +184,7 @@ func popLastDirectory(path string) string {
 	return path
 }
 
-// Returns true if file is new, modified or deleted
+// Returns true if file is new, modified or deleted.
 func fileChanged(repo *git.Repository, path string) (bool, error) {
 	status, err := repo.StatusFile(path)
 	if err != nil {
@@ -198,7 +199,7 @@ func fileChanged(repo *git.Repository, path string) (bool, error) {
 	return false, nil
 }
 
-// commits staged changes
+// Commits staged changes.
 func commit(path, msg string) (string, error) {
 
 	repo, err := git.OpenRepository(path)

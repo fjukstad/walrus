@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	wcontainer "github.com/fjukstad/walrus/container"
 	"github.com/fjukstad/walrus/lfs"
 	"github.com/fjukstad/walrus/pipeline"
 
@@ -30,6 +31,7 @@ var completedConditions []*sync.Cond
 var completedStages []bool
 var stageIndex map[string]int
 var currentUser string
+var profile *bool
 
 var numParallelWorkers = 5
 
@@ -190,6 +192,10 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 
 				numTries := 0
 
+				if *profile {
+					go wcontainer.Profile(c, containerId, hostpath+"/profile-"+stage.Name+".json")
+				}
+
 				for {
 					err = c.ContainerStart(context.Background(), containerId,
 						types.ContainerStartOptions{})
@@ -206,16 +212,18 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 					}
 				}
 
-				okCh, errCh := c.ContainerWait(context.Background(), containerId, container.WaitConditionNotRunning)
+				okC, errC := c.ContainerWait(context.Background(), containerId,
+					container.WaitConditionNotRunning)
 				select {
-				case err := <-errCh:
+				case err := <-errC:
 					if err != nil {
 						e <- errors.Wrap(err, "Failed to wait for container to finish")
 						return
 					}
-				case <-okCh:
-					stage.Runtime = time.Since(stageStart)
+				case <-okC: // simply drain wait ok channel
 				}
+
+				stage.Runtime = time.Since(stageStart)
 
 			}
 
@@ -268,7 +276,7 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 			return err
 		}
 
-		if p.VersionControl {
+		if p.Commit {
 			hostpath := rootpath + "/" + stage.Name
 			// add and commit output data
 			msg := "Add data pipeline stage: " + stage.Name
@@ -424,20 +432,28 @@ func fixMountPaths(stages []*pipeline.Stage) error {
 }
 
 func main() {
-	var configFilename = flag.String("i", "pipeline.json", "pipeline description file")
-	var outputDir = flag.String("o", "walrus", "where walrus should store output data on the host")
-	var web = flag.Bool("web", false, "host interactive visualization of the pipeline")
-	var port = flag.String("p", ":9090", "port to run web server for pipeline visualization")
-	var lfsServer = flag.Bool("lfs-server", false, "start an lfs-server, will not run the pipeline")
-	var lfsDir = flag.String("lfs-server-dir", "lfs", "host directory to store lfs objects")
-	var versionControl = flag.Bool("version-control", true, "version control output data automatically")
+	var configFilename = flag.String("i", "pipeline.json",
+		"pipeline description file")
+	var outputDir = flag.String("o", "walrus",
+		"where walrus should store output data on the host")
+	var web = flag.Bool("web", false,
+		"host interactive visualization of the pipeline")
+	var port = flag.String("p", ":9090",
+		"port to run web server for pipeline visualization")
+	var lfsServer = flag.Bool("lfs-server", false,
+		"start an lfs-server, will not run the pipeline")
+	var lfsServerDir = flag.String("lfs-server-dir", "lfs",
+		"host directory to store lfs objects")
+	var commit = flag.Bool("commit", false, "add and commit output data")
 	var logs = flag.String("logs", "", "get logs for pipeline stage")
 	var graphFilename = flag.String("graph", "", "write dot graph of the pipeline to the given filename and stop.")
+
+	profile = flag.Bool("profile", false, "collect runtime metrics for the pipeline stages")
 
 	flag.Parse()
 
 	if *lfsServer {
-		err := lfs.StartServer(*lfsDir)
+		err := lfs.StartServer(*lfsServerDir)
 		if err != nil {
 			log.Println("Could not start git-lfs server", err)
 		} else {
@@ -488,7 +504,7 @@ func main() {
 		return
 	}
 
-	p.VersionControl = *versionControl
+	p.Commit = *commit
 
 	err = fixMountPaths(p.Stages)
 	if err != nil {
