@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -447,6 +448,7 @@ func main() {
 	var commit = flag.Bool("commit", false, "add and commit output data")
 	var logs = flag.String("logs", "", "get logs for pipeline stage")
 	var graphFilename = flag.String("graph", "", "write dot graph of the pipeline to the given filename and stop.")
+	var printPipeline = flag.Bool("print", false, "print a pipeline configuration or completed pipeline \n\tconfiguration (use -i to specify its name and location)")
 
 	profile = flag.Bool("profile", false, "collect runtime metrics for the pipeline stages")
 
@@ -472,6 +474,16 @@ func main() {
 			return
 		}
 		log.Println(string(b))
+		return
+	}
+
+	if *printPipeline {
+		p, err := pipeline.ParseConfig(*configFilename)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		fmt.Println(p)
 		return
 	}
 

@@ -124,7 +124,7 @@ func (p Pipeline) FixDependencies() {
 // Stringify a pipeline description.
 func (p Pipeline) String() string {
 	str := "Name:" + p.Name
-	str += "Stages:\n"
+	str += "\nStages:\n"
 	for _, stage := range p.Stages {
 		str += stage.String()
 	}
@@ -144,7 +144,8 @@ func (stage Stage) String() string {
 	//str +=\t  "Cache:" + stage.Cache + "\n"
 	//str +=\t  "Mount Propagation:" + stage.MountPropagation + "\n"
 	str += "\t Comment: " + stage.Comment + "\n"
-	str += "\t Version: " + stage.Version
+	str += "\t Version: " + stage.Version + "\n"
+	str += "\t Runtime: " + stage.Runtime.String()
 	str += "\n"
 	return str
 }
