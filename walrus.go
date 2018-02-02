@@ -561,12 +561,6 @@ func main() {
 
 	log.Println("Pipeline completed in:", p.Runtime)
 
-	for _, stage := range p.Stages {
-		if stage.Version != "" {
-			log.Println(stage.Version)
-		}
-	}
-
 	err = p.WritePipelineDescription(*outputDir + "/" + *configFilename)
 	if err != nil {
 		log.Println(err)

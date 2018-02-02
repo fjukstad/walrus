@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -66,6 +67,9 @@ func (p Pipeline) WritePipelineDescription(filename string) error {
 	var b []byte
 	var err error
 
+	// first delete old config (if present)
+	os.Remove(filename)
+
 	switch extension := filepath.Ext(filename); extension {
 	case ".json":
 		b, err = json.Marshal(p)
@@ -73,7 +77,7 @@ func (p Pipeline) WritePipelineDescription(filename string) error {
 		b, err = yaml.Marshal(p)
 	}
 
-	err = ioutil.WriteFile(filename, b, 06666)
+	err = ioutil.WriteFile(filename, b, 0644)
 	if err != nil {
 		return err
 	}
@@ -128,7 +132,23 @@ func (p Pipeline) String() string {
 	for _, stage := range p.Stages {
 		str += stage.String()
 	}
+
+	str += "\n"
+	str += "Comment: " + p.Comment + "\n"
+
+	str += "Variables: "
+	for _, variable := range p.Variables {
+		str += "\n\t" + variable.String()
+	}
+	str += "\n"
+
+	str += "Runtime: " + p.Runtime.String()
+
 	return str
+}
+
+func (v Variable) String() string {
+	return v.Name + "=" + strings.Join(v.Values, ",")
 }
 
 // Stringify a pipeline stage.
