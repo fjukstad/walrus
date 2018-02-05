@@ -44,6 +44,5 @@ func Profile(c *client.Client, containerID, filename string) {
 				return
 			}
 		}
-
 	}
 }
