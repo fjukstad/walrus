@@ -288,7 +288,15 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 				log.Println(err)
 			}
 			stage.Version = commitId
+
+			head, err := lfs.GetHead(hostpath)
+			if err != nil {
+				e <- errors.Wrap(err, "Could not get git head")
+				log.Println(err)
+			}
+			p.Version = head
 		}
+
 	}
 
 	// Restore permission bits to output directory

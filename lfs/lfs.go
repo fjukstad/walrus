@@ -351,3 +351,21 @@ func StartServer(mountDir string) error {
 	return err
 
 }
+
+// Get the head id of the repository found at hostpath
+func GetHead(hostpath string) (string, error) {
+
+	repo, _, err := openRepository(hostpath)
+	if err != nil {
+		return "", errors.Wrap(err, "Could not open repository")
+	}
+
+	ref, err := repo.Head()
+	if err != nil {
+		return "", errors.Wrap(err, "Could not get head")
+	}
+
+	head := ref.Target()
+
+	return head.String(), nil
+}

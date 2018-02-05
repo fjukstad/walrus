@@ -9,6 +9,7 @@ type Pipeline struct {
 	Variables []Variable
 	Commit    bool
 	Runtime   time.Duration
+	Version   string
 }
 
 type Variable struct {

@@ -140,8 +140,11 @@ func (p Pipeline) String() string {
 	for _, variable := range p.Variables {
 		str += "\n\t" + variable.String()
 	}
-	str += "\n"
 
+	str += "\n"
+	str += "Version: " + p.Version
+
+	str += "\n"
 	str += "Runtime: " + p.Runtime.String()
 
 	return str
