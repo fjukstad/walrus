@@ -281,6 +281,7 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 			hostpath := rootpath + "/" + stage.Name
 			// add and commit output data
 			msg := "Add data pipeline stage: " + stage.Name
+			msg += "\n\n" + stage.String()
 			commitId, err := lfs.AddAndCommitData(hostpath, msg)
 			if err != nil {
 				e <- errors.Wrap(err, "Could not commit output data "+stage.Name)
@@ -559,7 +560,7 @@ func main() {
 		return
 	}
 
-	log.Println("All stages completed successfully.", "\nOutput written to ",
+	log.Println("All stages completed successfully. Output written to ",
 		hostpath)
 
 	log.Println("Pipeline completed in:", p.Runtime)
