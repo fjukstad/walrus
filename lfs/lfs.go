@@ -2,8 +2,8 @@ package lfs
 
 import (
 	"context"
-	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -274,7 +274,7 @@ func openRepository(path string) (repo *git.Repository, repositoryPath string, e
 			// Root hit
 			if path == "/" {
 				path = wd
-				fmt.Println("Output directory is not in a git repository. Creating one in " + path)
+				log.Println("Output directory is not in a git repository. Creating one in " + path)
 				repo, err = git.InitRepository(wd, false)
 				if err != nil {
 					return nil, "", errors.Wrap(err, "Could not initialize git repository")
