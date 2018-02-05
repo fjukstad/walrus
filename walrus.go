@@ -479,11 +479,14 @@ func main() {
 
 	if *printPipeline {
 		p, err := pipeline.ParseConfig(*configFilename)
-		if err != nil {
-			log.Println(err)
-			return
+		switch err.(type) {
+		case nil:
+			fmt.Println(p)
+		case *pipeline.NameError:
+			fmt.Println(p)
+		default:
+			fmt.Println(err)
 		}
-		fmt.Println(p)
 		return
 	}
 

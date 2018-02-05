@@ -31,7 +31,7 @@ func ParseConfig(filename string) (*Pipeline, error) {
 
 	err = CheckNames(p)
 	if err != nil {
-		return nil, err
+		return &p, err
 	}
 
 	p, err = FindAndReplaceVariables(p, file)
@@ -264,16 +264,18 @@ func FindAndReplaceVariables(p Pipeline, file []byte) (Pipeline, error) {
 // Verify that the pipeline name and pipeline stage names are valid.
 func CheckNames(p Pipeline) error {
 	if badName(p.Name) {
-		return errors.New("Pipeline name: '" + p.Name + "' should be a single word without any special characters")
+		return &NameError{p.Name,
+			"Pipeline names should be a single word without any special characters"}
 	}
 
 	for _, stage := range p.Stages {
 		if badName(stage.Name) {
-			return errors.New("Stage name: '" + stage.Name + "' should be a single word without any special characters")
+			return &NameError{stage.Name,
+				"Stage name should be a single word without any special characters"}
 		}
 
 		if strings.Contains(stage.Name, parallelIdentifier) {
-			return errors.New("Stage name: '" + stage.Name + "' shuold not contain " + parallelIdentifier)
+			return &NameError{stage.Name, "Stage names should not contain " + parallelIdentifier}
 		}
 	}
 	return nil
