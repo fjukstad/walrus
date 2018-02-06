@@ -573,10 +573,20 @@ func main() {
 
 	log.Println("Pipeline completed in:", p.Runtime)
 
-	err = p.WritePipelineDescription(*outputDir + "/" + *configFilename)
+	completedPipelineDescription := *outputDir + "/" + *configFilename
+
+	err = p.WritePipelineDescription(completedPipelineDescription)
 	if err != nil {
 		log.Println(err)
 		return
+	}
+
+	if p.Commit {
+		_, err = lfs.AddAndCommit(completedPipelineDescription, "Add pipeline configuration")
+		if err != nil {
+			log.Println(err)
+			return
+		}
 	}
 	return
 }

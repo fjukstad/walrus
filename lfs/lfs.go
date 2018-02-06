@@ -39,7 +39,7 @@ func Track(filename, repositoryLocation string) (string, error) {
 	return output, err
 }
 
-// Adds and commits data found in inputPath
+// Adds and commits data found in path
 func AddAndCommitData(path, msg string) (string, error) {
 
 	changes, repositoryLocation, err := Add(path)
@@ -58,8 +58,48 @@ func AddAndCommitData(path, msg string) (string, error) {
 	return commitId, nil
 }
 
-// Add the given path to the index. Will return true if there's anything to be
-// committed.
+// Add and commit file
+func AddAndCommit(filename, msg string) (string, error) {
+	// Strip path from filename
+	path := filepath.Dir(filename)
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+
+	// Open repository at path.
+	repo, repositoryLocation, err := openRepository(path)
+	if err != nil {
+		return "", err
+	}
+
+	// Check if the file has been changed and commit it if it has.
+	changed, err := fileChanged(repo, filename)
+	if err != nil {
+		return "", err
+	}
+
+	var commitId string
+
+	if changed {
+		err := addToIndex(repo, filename)
+		if err != nil {
+			return "", err
+		}
+
+		commitId, err = commit(repositoryLocation, msg)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		return "", errors.New("No changes. Nothing to commit")
+	}
+
+	return commitId, nil
+}
+
+// Add the data at the path to the index. Will return true if there's anything
+// to be committed.
 func Add(path string) (changes bool, repositoryLocation string, err error) {
 
 	wd, err := os.Getwd()
