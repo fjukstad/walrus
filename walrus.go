@@ -270,13 +270,16 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 
 	var err error
 
-	for _, stage := range p.Stages {
+	for i, stage := range p.Stages {
 
 		err = <-e
 		if err != nil {
 			return err
 		}
 
+		// If version control is enabled we'll add all output data to the
+		// repository and write commitid of the last stage to the pipeline
+		// description file.
 		if p.Commit {
 			hostpath := rootpath + "/" + stage.Name
 			// add and commit output data
@@ -287,13 +290,14 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 				e <- errors.Wrap(err, "Could not commit output data "+stage.Name)
 				log.Println(err)
 			}
-			stage.Version = commitId
+			p.Stages[i].Version = commitId
 
 			head, err := lfs.GetHead(hostpath)
 			if err != nil {
 				e <- errors.Wrap(err, "Could not get git head")
 				log.Println(err)
 			}
+
 			p.Version = head
 		}
 
