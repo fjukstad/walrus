@@ -437,7 +437,7 @@ func fixMountPaths(stages []*pipeline.Stage) error {
 }
 
 func main() {
-	var configFilename = flag.String("i", "pipeline.json",
+	var configFilename = flag.String("i", "",
 		"pipeline description file")
 	var outputDir = flag.String("o", "walrus",
 		"where walrus should store output data on the host")
@@ -453,10 +453,24 @@ func main() {
 	var logs = flag.String("logs", "", "get logs for pipeline stage")
 	var graphFilename = flag.String("graph", "", "write dot graph of the pipeline to the given filename and stop.")
 	var printPipeline = flag.Bool("print", false, "print a pipeline configuration or completed pipeline \n\tconfiguration (use -i to specify its name and location)")
+	//var restore = flag.Bool("restore", false, "restore pipeline output data to a known previous run. Use ")
+
+	var results = flag.Bool("printResults", false, "print pipeline configuration of completed pipeline")
 
 	profile = flag.Bool("profile", false, "collect runtime metrics for the pipeline stages")
 
 	flag.Parse()
+
+	defaultConfigFilename := "pipeline.json"
+	if *configFilename == "" {
+		log.Println("No pipeline description file set. Using", defaultConfigFilename)
+		*configFilename = defaultConfigFilename
+	}
+
+	if *results {
+		*printPipeline = true
+		*configFilename = *outputDir + "/" + *configFilename
+	}
 
 	if *lfsServer {
 		err := lfs.StartServer(*lfsServerDir)
@@ -577,11 +591,17 @@ func main() {
 	}
 
 	if p.Commit {
-		_, err = lfs.AddAndCommit(completedPipelineDescription, "Add pipeline configuration")
+		err = lfs.Add(*configFilename)
 		if err != nil {
 			log.Println(err)
 			return
 		}
+		commitId, err := lfs.AddAndCommit(completedPipelineDescription, "Add pipeline configurations")
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		log.Println("Pipeline completed. Use id", commitId, "to reference it later")
 	}
 	return
 }

@@ -42,7 +42,7 @@ func Track(filename, repositoryLocation string) (string, error) {
 // Adds and commits data found in path
 func AddAndCommitData(path, msg string) (string, error) {
 
-	changes, repositoryLocation, err := Add(path)
+	changes, repositoryLocation, err := AddData(path)
 	if err != nil {
 		return "", err
 	}
@@ -58,17 +58,49 @@ func AddAndCommitData(path, msg string) (string, error) {
 	return commitId, nil
 }
 
-// Add and commit file
-func AddAndCommit(filename, msg string) (string, error) {
+// Add a file to the index
+func Add(filename string) error {
+	// Open repository at path.
+	repo, _, err := openContainingRepository(filename)
+	if err != nil {
+		return err
+	}
+
+	// Check if the file has been changed and commit it if it has.
+	changed, err := fileChanged(repo, filename)
+	if err != nil {
+		return err
+	}
+
+	if changed {
+		err := addToIndex(repo, filename)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func openContainingRepository(filename string) (repo *git.Repository,
+	repositoryLocation string, err error) {
+
 	// Strip path from filename
 	path := filepath.Dir(filename)
-	path, err := filepath.Abs(path)
+	path, err = filepath.Abs(path)
 	if err != nil {
-		return "", err
+		return nil, "", err
 	}
 
 	// Open repository at path.
-	repo, repositoryLocation, err := openRepository(path)
+	return openRepository(path)
+
+}
+
+// Add and commit file
+func AddAndCommit(filename, msg string) (string, error) {
+	// Open repository at path.
+	repo, repositoryLocation, err := openContainingRepository(filename)
 	if err != nil {
 		return "", err
 	}
@@ -100,7 +132,7 @@ func AddAndCommit(filename, msg string) (string, error) {
 
 // Add the data at the path to the index. Will return true if there's anything
 // to be committed.
-func Add(path string) (changes bool, repositoryLocation string, err error) {
+func AddData(path string) (changes bool, repositoryLocation string, err error) {
 
 	wd, err := os.Getwd()
 	if err != nil {
