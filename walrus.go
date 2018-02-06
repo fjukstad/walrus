@@ -453,7 +453,7 @@ func main() {
 	var logs = flag.String("logs", "", "get logs for pipeline stage")
 	var graphFilename = flag.String("graph", "", "write dot graph of the pipeline to the given filename and stop.")
 	var printPipeline = flag.Bool("print", false, "print a pipeline configuration or completed pipeline \n\tconfiguration (use -i to specify its name and location)")
-	//var restore = flag.Bool("restore", false, "restore pipeline output data to a known previous run. Use ")
+	var diff = flag.String("diff", "", "print difference of current pipeline run and the given ID")
 
 	var results = flag.Bool("printResults", false, "print pipeline configuration of completed pipeline")
 
@@ -466,10 +466,19 @@ func main() {
 		log.Println("No pipeline description file set. Using", defaultConfigFilename)
 		*configFilename = defaultConfigFilename
 	}
-
 	if *results {
 		*printPipeline = true
 		*configFilename = *outputDir + "/" + *configFilename
+	}
+
+	if *diff != "" {
+		str, err := lfs.PrintDiff(*outputDir, *diff)
+		if err != nil {
+			log.Println(err)
+		}
+
+		log.Println("Difference since " + *diff + ":\n" + str)
+		return
 	}
 
 	if *lfsServer {

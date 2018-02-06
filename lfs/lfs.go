@@ -441,3 +441,47 @@ func GetHead(hostpath string) (string, error) {
 
 	return head.String(), nil
 }
+
+func PrintDiff(path, id string) (string, error) {
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return "", errors.Wrap(err, "Could not get absolute path of output directory")
+	}
+
+	repo, _, err := openRepository(path)
+	if err != nil {
+		return "", errors.Wrap(err, "Could not open repository")
+	}
+
+	index, err := repo.Index()
+	if err != nil {
+		return "", errors.Wrap(err, "Could not get head")
+	}
+
+	oid, err := git.NewOid(id)
+	if err != nil {
+		return "", errors.Wrap(err, "Could not create oid for id "+id)
+	}
+
+	commit, err := repo.LookupCommit(oid)
+	if err != nil {
+		return "", errors.Wrap(err, "Could not lookup commit id "+id)
+	}
+
+	oldTree, err := commit.Tree()
+	if err != nil {
+		return "", errors.Wrap(err, "Could not lookup tree")
+	}
+
+	diff, err := repo.DiffTreeToIndex(oldTree, index, &git.DiffOptions{})
+	if err != nil {
+		return "", errors.Wrap(err, "Could not diff tree to index")
+	}
+
+	stats, err := diff.Stats()
+	if err != nil {
+		return "", errors.Wrap(err, "Could not get diff stats")
+	}
+
+	return stats.String(git.DiffStatsFull, 80)
+}
