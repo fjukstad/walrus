@@ -302,15 +302,6 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 		}
 
 	}
-
-	// Restore permission bits to output directory
-	// err := filepath.Walk(rootpath, func(name string, info os.FileInfo, err error) error {
-	// 	return os.Chmod(name, 0666)
-	// })
-	// if err != nil {
-	// 	return err
-	// }
-
 	return nil
 }
 
