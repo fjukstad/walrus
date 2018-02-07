@@ -485,3 +485,32 @@ func PrintDiff(path, id string) (string, error) {
 
 	return stats.String(git.DiffStatsFull, 80)
 }
+
+func Reset(path, id string) error {
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return errors.Wrap(err, "Could not get absolute path of output directory")
+	}
+
+	repo, _, err := openRepository(path)
+	if err != nil {
+		return errors.Wrap(err, "Could not open repository")
+	}
+
+	oid, err := git.NewOid(id)
+	if err != nil {
+		return errors.Wrap(err, "Could not create oid for id "+id)
+	}
+
+	commit, err := repo.LookupCommit(oid)
+	if err != nil {
+		return errors.Wrap(err, "Could not lookup commit id "+id)
+	}
+
+	err = repo.ResetToCommit(commit, git.ResetMixed, &git.CheckoutOpts{})
+	if err != nil {
+		return errors.Wrap(err, "Could not reset to id "+id)
+	}
+	return nil
+
+}

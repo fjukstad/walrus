@@ -459,11 +459,13 @@ func main() {
 
 	profile = flag.Bool("profile", false, "collect runtime metrics for the pipeline stages")
 
+	var reset = flag.String("reset", "", "reset walrus output back to a known configuration (warning: will roll back repository and delete newer changes)")
+
 	flag.Parse()
 
 	defaultConfigFilename := "pipeline.json"
 	if *configFilename == "" {
-		log.Println("No pipeline description file set. Using", defaultConfigFilename)
+		log.Println("No pipeline description file set. Using default", defaultConfigFilename)
 		*configFilename = defaultConfigFilename
 	}
 	if *results {
@@ -477,8 +479,35 @@ func main() {
 			log.Println(err)
 		}
 
-		log.Println("Difference since " + *diff + ":\n" + str)
+		log.Println("Difference from pipeline run " + *diff + ":\n" + str)
 		return
+	}
+
+	if *reset != "" {
+		fmt.Println("Are you sure you want to resset the walrus results?")
+		fmt.Println("This will remove all provenance information on files created later (Y/n).")
+
+		var input string
+		_, err := fmt.Fscanln(os.Stdin, &input)
+		if err != nil {
+			log.Println("Could not read input:", err)
+			return
+		}
+
+		if input == "Y" {
+			log.Println("Resetting data to pipeline run", *reset)
+			err = lfs.Reset(*outputDir, *reset)
+			if err != nil {
+				log.Println("Could not reset walrus results to id", *reset, err)
+				return
+			}
+			log.Println("Successfully reset to", *reset)
+			log.Println("Any data that was created later than this ID is still available")
+			return
+		} else {
+			return
+		}
+
 	}
 
 	if *lfsServer {
