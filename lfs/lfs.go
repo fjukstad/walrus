@@ -94,7 +94,6 @@ func openContainingRepository(filename string) (repo *git.Repository,
 
 	// Open repository at path.
 	return openRepository(path)
-
 }
 
 // Add and commit file
@@ -215,8 +214,8 @@ func AddData(path string) (changes bool, repositoryLocation string, err error) {
 		}
 	}
 	changes = changed
-	return changes, repositoryLocation, nil
 
+	return changes, repositoryLocation, nil
 }
 
 // Add a path to the index.
@@ -421,7 +420,6 @@ func StartServer(mountDir string) error {
 	err = c.ContainerStart(context.Background(), containerId,
 		types.ContainerStartOptions{})
 	return err
-
 }
 
 // Get the head id of the repository found at hostpath
@@ -512,5 +510,4 @@ func Reset(path, id string) error {
 		return errors.Wrap(err, "Could not reset to id "+id)
 	}
 	return nil
-
 }
