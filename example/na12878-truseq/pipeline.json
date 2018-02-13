@@ -1,0 +1,215 @@
+{
+
+    "Name":"paperbench",
+    "Variables": [
+        {
+            "Name": "sample",
+            "Values": ["SRR098401_1", "SRR098401_2"]
+        },
+        {
+            "Name": "name",
+            "Values": ["NA12878"]
+        }, 
+        {
+            "Name": "sample1",
+            "Values": ["SRR098401_1"]
+        },
+        {
+            "Name": "sample2",
+            "Values": ["SRR098401_2"]
+        }
+    ],
+    "Stages": [
+        {
+            "Name": "input",
+            "Image": "fjukstad/seqbase",
+
+            "Cmd": ["sh", "-c", "cp /data/* /walrus/input"],
+            "Volumes": ["data:/data"],
+            "Comments":"reference from ftp://ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/reference/. data from https://www.ebi.ac.uk/ena/data/view/SRR098401",
+            "Cache": true
+        },
+        {
+            "Name": "filter",
+            "Image": "fjukstad/fastq_quality_filter",
+            "Cmd": ["-Q 33", "-q 30", "-p 50", 
+                "-i", "/walrus/input/{{sample}}.fastq",
+                "-o", "/walrus/filter/{{sample}}_filtered.fastq"
+            ],
+            "Inputs": ["input"],
+            "Cache":true
+        },
+        {
+            "Name":"bwaindex",
+            "Image":"fjukstad/bwa",
+            "Entrypoint":["/bin/sh"], 
+            "Cmd":[
+                "-c",
+                "/tools/bwa/bwa index /walrus/input/human_g1k_v37.fasta"
+            ],
+            "Inputs":["input"],
+            "Cache": true
+        },
+         {
+            "Name": "repair",
+            "Image": "fjukstad/bbmap-repair",
+            "Cmd": [
+                "in1=/walrus/filter/{{sample1}}_filtered.fastq",
+                "in2=/walrus/filter/{{sample2}}_filtered.fastq",
+                "out1=/walrus/repair/{{sample1}}_filtered.fastq",
+                "out2=/walrus/repair/{{sample2}}_filtered.fastq",
+                "outs=/walrus/repair/singletons.fq.gz"
+            ],
+            "Inputs": ["filter"],
+            "Cache": true
+         }, 
+        {
+            "Name": "align",
+            "Image":"fjukstad/bwa",
+            "Entrypoint":["/bin/sh"],
+            "Cmd":[
+                "-c",
+                "/tools/bwa/bwa mem -t 10 /walrus/input/human_g1k_v37.fasta /walrus/repair/{{sample1}}_filtered.fastq /walrus/repair/{{sample2}}_filtered.fastq > /walrus/align/sample.sam"
+            ],
+            "Inputs" : [
+                "repair", "bwaindex"
+            ],
+            "Cache": true
+        },
+         {
+            "Name":"samtobam",
+            "Image":"fjukstad/samtools",
+            "Cmd":[
+                "view", "-bS", "/walrus/align/sample.sam",
+                "-o", "/walrus/samtobam/sample.bam"
+            ],
+            "Inputs": ["align"],
+            "Cache": true
+        },
+        {
+            "Name":"sortsam",
+            "Image":"fjukstad/picard",
+            "Cmd":[
+                "SortSam", "VALIDATION_STRINGENCY=SILENT",
+                "I=/walrus/samtobam/sample.bam",
+                "O=/walrus/sortsam/{{name}}.bam",
+                "SORT_ORDER=coordinate"
+            ],
+            "Inputs": ["samtobam"],
+            "Cache": true
+        },
+        {
+            "Name":"removeduplicates",
+            "Image":"fjukstad/picard",
+            "Cmd":[
+                "MarkDuplicates", "VALIDATION_STRINGENCY=SILENT",
+                "I=/walrus/sortsam/{{name}}.bam",
+                "O=/walrus/removeduplicates/{{name}}.bam",
+                "M=/walrus/removeduplicates/metrics"
+            ],
+            "Inputs": ["sortsam"],
+            "Cache": true
+        },
+        {
+            "Name":"addreadgroups",
+            "Image":"fjukstad/picard",
+            "Cmd":[
+                "AddOrReplaceReadGroups", "VALIDATION_STRINGENCY=SILENT",
+                "I=/walrus/removeduplicates/{{name}}.bam",
+                "O=/walrus/addreadgroups/{{name}}.bam",
+                "SORT_ORDER=coordinate",
+                "RGID=NA12878", 
+                "RGLB=NA12878", 
+                "RGPL=illumina", 
+                "RGPU=NA12878",
+                "RGSM=NA12878",
+                "CREATE_INDEX=true"
+
+            ],
+            "Inputs": ["removeduplicates"],
+            "Cache": true
+        },
+        {
+            "Name":"createdict",
+            "Image":"fjukstad/picard",
+            "Cmd":[
+                    "CreateSequenceDictionary",
+                    "R=/walrus/input/human_g1k_v37.fasta",
+                    "O=/walrus/input/human_g1k_v37.dict"
+            ],
+            "Inputs": ["input"],
+            "Comment": "The GATK uses two files to access and safety check access to the reference files: a .dict dictionary of the contig names and sizes and a .fai fasta index file to allow efficient random access to the reference bases. You have to generate these files in order to be able to use a Fasta file as reference.",
+            "Cache": true
+        },
+        {
+            "Name":"targetcreator",
+            "Image":"fjukstad/gatk",
+            "Cmd":[
+                "-T", "RealignerTargetCreator",
+                "-R", "/walrus/input/human_g1k_v37.fasta",
+                "-I", "/walrus/addreadgroups/{{name}}.bam",
+                "-known", "/walrus/input/mills.vcf",
+                "-o", "/walrus/targetcreator/{{name}}.intervals"
+            ],
+            "Inputs": ["addreadgroups", "createdict"],
+            "Cache": true
+        },
+        {
+            "Name":"indelrealigner",
+            "Image":"fjukstad/gatk",
+            "Cmd":[
+                "-T", "IndelRealigner",
+                "-R", "/walrus/input/human_g1k_v37.fasta",
+                "-I", "/walrus/addreadgroups/{{name}}.bam",
+                "-known", "/walrus/input/mills.vcf",
+                "--maxReadsForRealignment", "100000",
+                "--maxReadsInMemory", "1000000 ",
+                "--targetIntervals", "/walrus/targetcreator/{{name}}.intervals",
+                "-o", "/walrus/indelrealigner/{{name}}.bam"
+            ],
+            "Inputs": ["targetcreator"],
+            "Comments": "Note that in the paper (online version) the arguments with `--` are listed with a single (but longer) `-`. This causes the step to fail...",
+            "Cache": true
+        },
+        {
+            "Name":"baserecalibration",
+            "Image":"fjukstad/gatk",
+            "Cmd":[
+                "-T", "BaseRecalibrator",
+                "-R", "/walrus/input/human_g1k_v37.fasta",
+                "-I", "/walrus/indelrealigner/{{name}}.bam",
+                "-knownSites", "/walrus/input/dbsnp_138.b37.excluding_sites_after_129.vcf",
+                "-o", "/walrus/baserecalibration/{{name}}.bam"
+            ],
+            "Inputs": ["indelrealigner"],
+            "Cache": true
+        },
+        {
+            "Name":"printreads",
+            "Image":"fjukstad/gatk",
+            "Cmd":[
+                "-T", "PrintReads",
+                "-R", "/walrus/input/human_g1k_v37.fasta",
+                "-I", "/walrus/indelrealigner/{{name}}.bam",
+                "-BQSR", "/walrus/baserecalibration/{{name}}.bam",
+                "-o", "/walrus/printreads/{{name}}.bam"
+            ],
+            "Inputs": ["baserecalibration"],
+            "Cache": true
+        },
+        {
+            "Name":"haplotypecaller",
+            "Image":"fjukstad/gatk",
+            "Cmd":[
+                "-T", "HaplotypeCaller",
+                "-R", "/walrus/input/human_g1k_v37.fasta",
+                "-I", "/walrus/printreads/{{name}}.bam",
+                "--dbsnp", "/walrus/input/dbsnp_138.b37.excluding_sites_after_129.vcf",
+                "-o", "/walrus/haplotypecaller/{{name}}-variants.vcf"
+            ],
+            "Inputs": ["printreads"],
+            "Comments":"In the paper the input file is not referenced before this step. It does not have the same filename as the output file from the previous step, but we assume that it's the output of the printreads step. Also the dbsnp argument has not been referenced earlier.",
+            "Cache": true
+        }
+    ]
+}
