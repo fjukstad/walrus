@@ -1,6 +1,8 @@
 # Example NA12878 TruSeq variant caller 
 This example pipeline uses GATK to call variants in the popular NA12878
-dataset. 
+dataset. The pipeline is based on 
+[Cornish, A. and Guda, C., 2015. A comparison of variant calling pipelines using genome in a bottle as a reference. BioMed research international, 2015.](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4619817/).
+
 
 # Run 
 
