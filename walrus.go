@@ -270,32 +270,39 @@ func run(c *client.Client, p *pipeline.Pipeline, rootpath, filename string) erro
 
 	var err error
 
-	for i, stage := range p.Stages {
-
+	// Check for any error and return
+	for range p.Stages {
 		err = <-e
 		if err != nil {
 			return err
 		}
+	}
 
-		// If version control is enabled we'll add all output data to the
-		// repository and write commitid of the last stage to the pipeline
-		// description file.
-		if p.Commit {
-			hostpath := rootpath + "/" + stage.Name
+	// If version control is enabled we'll add all output data to the
+	// repository and write commitid of the last stage to the pipeline
+	// description file.
+	if p.Commit {
+
+		// Commit output data
+		for i, stage := range p.Stages {
+
+			// use first part of name since it might be a parallel stage with
+			// the additional _paralell_stageName
+			stageName := strings.Split(stage.Name, "_")[0]
+			hostpath := rootpath + "/" + stageName
+
 			// add and commit output data
-			msg := "Add data pipeline stage: " + stage.Name
-			msg += "\n\n" + stage.String()
+			msg := "Add data pipeline stage: " + stageName
 			commitId, err := lfs.AddAndCommitData(hostpath, msg)
 			if err != nil {
-				e <- errors.Wrap(err, "Could not commit output data "+stage.Name)
-				log.Println(err)
+				return errors.Wrap(err, "Could not commit output data "+stageName)
 			}
+
 			p.Stages[i].Version = commitId
 
 			head, err := lfs.GetHead(hostpath)
 			if err != nil {
-				e <- errors.Wrap(err, "Could not get git head")
-				log.Println(err)
+				return errors.Wrap(err, "Could not get git head")
 			}
 
 			p.Version = head

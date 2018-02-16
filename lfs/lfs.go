@@ -189,6 +189,10 @@ func AddData(path string) (changes bool, repositoryLocation string, err error) {
 	changed = false
 
 	err = filepath.Walk(dataPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return errors.Wrap(err, "Could not add "+path+"to repository")
+		}
+
 		if info.IsDir() {
 			return nil
 		}
