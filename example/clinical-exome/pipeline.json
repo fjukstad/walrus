@@ -1,0 +1,685 @@
+{
+    "Name": "exome",
+    "Variables": [
+      { "Name": "tumor", "Values":["HI.3840.008.SSXT96_C12"]},
+      { "Name": "normal", "Values":["HI.3840.008.SSXT96_D12"]}
+    ],
+    "Stages": [
+        {
+            "Name": "input",
+            "Image": "fjukstad/seqbase",
+            "Cmd": [
+                "sh", "-c", "cp -R /home/data/refined/bam/orig/* /walrus/input/"
+            ],
+            "Volumes": [
+                "/home/data/:/home/data" 
+            ], 
+            "MountPropagation":"private",
+            "Cache": true,
+            "Comment":"Copy input dataset" 
+        },
+        {
+            "Name": "TumorBam2FastQ",
+            "Image":"fjukstad/picard",
+            "Cmd":[
+                "SamToFastq", "INPUT=/walrus/input/tumor.bam",
+                "F=/walrus/TumorBam2FastQ/tumor.pair1.fastq",
+                "F2=/walrus/TumorBam2FastQ/tumor.pair2.fastq"
+            ],
+            "Inputs" : [
+                "input"
+            ],
+            "Cache":true ,
+            "Comment": "Generate fastq files from original tumor .bam file" 
+            
+        }, 
+        {
+            "Name": "NormalBam2FastQ",
+            "Image":"fjukstad/picard",
+            "Cmd":[
+                "SamToFastq", "INPUT=/walrus/input/normal.bam",
+                "F=/walrus/NormalBam2FastQ/normal.pair1.fastq",
+                "F2=/walrus/NormalBam2FastQ/normal.pair2.fastq"
+            ],
+            "Inputs" : [
+                "input"
+            ],
+            "Cache":true ,
+            "Comment": "Generate fastq files from original normal .bam file" 
+            
+        }, 
+        {
+            "Name": "TumorFastQCOriginalDataset",
+            "Image":"fjukstad/fastqc",
+            "Cmd":[
+                "/walrus/TumorBam2FastQ/tumor.pair1.fastq",
+                "/walrus/TumorBam2FastQ/tumor.pair2.fastq",
+                "--outdir=/walrus/TumorFastQCOriginalDataset"
+            ],
+            "Inputs" : [
+                "TumorBam2FastQ"
+            ],
+            "Comment":"Fastqc report from original tumor .fastq files",
+            "Cache": true
+            
+        },
+        {
+            "Name": "NormalFastQCOriginalDataset",
+            "Image":"fjukstad/fastqc",
+            "Cmd":[
+                "/walrus/NormalBam2FastQ/normal.pair1.fastq",
+                "/walrus/NormalBam2FastQ/normal.pair2.fastq",
+                "--outdir=/walrus/NormalFastQCOriginalDataset"
+            ],
+            "Inputs" : [
+                "NormalBam2FastQ"
+            ],
+            "Comment":"Fastqc report from original normal .fastq files",
+            "Cache": true
+            
+        },
+        {
+            "Name" : "TumorInsertSizeOriginalDataset",
+            "Image": "fjukstad/picard",
+            "Cmd":[
+                "CollectInsertSizeMetrics",
+                "INPUT=/walrus/input/tumor.bam",
+                "OUTPUT=/walrus/TumorInsertSizeOriginalDataset/tumor.tsv", 
+                "H=/walrus/TumorInsertSizeOriginalDataset/tumor.pdf"
+            ],
+            "Inputs" : [
+                "TumorFastQCOriginalDataset"
+            ],
+            "Cache":true,
+            "Comment":" Generate insert size report with picard tools"
+        },
+         {
+            "Name" : "NormalInsertSizeOriginalDataset",
+            "Image": "fjukstad/picard",
+            "Cmd":[
+                "CollectInsertSizeMetrics",
+                "INPUT=/walrus/input/normal.bam",
+                "OUTPUT=/walrus/NormalInsertSizeOriginalDataset/normal.tsv", 
+                "H=/walrus/NormalInsertSizeOriginalDataset/normal.pdf"
+            ],
+            "Inputs" : [
+                "NormalFastQCOriginalDataset"
+            ],
+            "Cache":true,
+            "Comment":" Generate insert size report with picard tools"
+        },
+        {
+            "Name": "illuminaAdapters",
+            "Image": "fjukstad/seqbase",
+            "Cmd": [
+                "sh", "-c", "cp /home/data/refined/other/adapters.fa /walrus/illuminaAdapters/adapters.fa"
+            ],
+            "Volumes": [
+                "/home/data/:/home/data" 
+            ], 
+            "MountPropagation":"private",
+            "Cache": true,
+            "Comment":"Copy illumina adapters" 
+        },
+        {
+            "Name" : "TumorTrimOriginalDataset",
+            "Image": "fjukstad/trimmomatic",
+            "Cmd":["PE","-threads", "10", "-phred33",
+                "/walrus/TumorBam2FastQ/tumor.pair1.fastq",
+                "/walrus/TumorBam2FastQ/tumor.pair2.fastq",
+                "/walrus/TumorTrimOriginalDataset/tumor.pair1.fastq",
+                "/walrus/TumorTrimOriginalDataset/tumor.pair1.unpaired.fastq",
+                "/walrus/TumorTrimOriginalDataset/tumor.pair2.fastq",
+                "/walrus/TumorTrimOriginalDataset/tumor.pair2.unpaired.fastq",
+                "ILLUMINACLIP:/walrus/illuminaAdapters/adapters.fa:2:20:10",
+                "TRAILING:30",
+                "LEADING:30", 
+                "MINLEN:50",
+                "CROP:105"
+            ],
+            "Inputs" : [
+                "TumorBam2FastQ",
+                "illuminaAdapters" 
+            ],
+            "Comment":"Trim original dataset using trimmomatic",
+            "Cache": true
+
+        },
+        {
+            "Name" : "NormalTrimOriginalDataset",
+            "Image": "fjukstad/trimmomatic",
+            "Cmd":["PE","-threads", "10", "-phred33",
+                "/walrus/NormalBam2FastQ/normal.pair1.fastq",
+                "/walrus/NormalBam2FastQ/normal.pair2.fastq",
+                "/walrus/NormalTrimOriginalDataset/normal.pair1.fastq",
+                "/walrus/NormalTrimOriginalDataset/normal.pair1.unpaired.fastq",
+                "/walrus/NormalTrimOriginalDataset/normal.pair2.fastq",
+                "/walrus/NormalTrimOriginalDataset/normal.pair2.unpaired.fastq",
+                "ILLUMINACLIP:/walrus/illuminaAdapters/adapters.fa:2:20:10",
+                "TRAILING:30",
+                "LEADING:30", 
+                "MINLEN:50",
+                "CROP:105"
+            ],
+            "Inputs" : [
+                "NormalBam2FastQ",
+                "illuminaAdapters" 
+            ],
+            "Comment":"Trim original dataset using trimmomatic",
+            "Cache": true
+
+        },
+         {
+            "Name": "TumorFastQCTrimmedDataset",
+            "Image":"fjukstad/fastqc",
+            "Cmd":[
+                "--threads","10",
+                "/walrus/TumorTrimOriginalDataset/tumor.pair1.fastq",
+                "/walrus/TumorTrimOriginalDataset/tumor.pair2.fastq",
+                "--outdir=/walrus/TumorFastQCTrimmedDataset"
+            ],
+            "Inputs" : [
+                "TumorTrimOriginalDataset"
+            ],
+            "Comment":"Fastqc report from on trimmed .fastq files",
+            "Cache": true
+        }, 
+         {
+            "Name": "NormalFastQCTrimmedDataset",
+            "Image":"fjukstad/fastqc",
+            "Cmd":[
+                "--threads", "10",
+                "/walrus/NormalTrimOriginalDataset/normal.pair1.fastq",
+                "/walrus/NormalTrimOriginalDataset/normal.pair2.fastq",
+                "--outdir=/walrus/NormalFastQCTrimmedDataset"
+            ],
+            "Inputs" : [
+                "NormalTrimOriginalDataset"
+            ],
+            "Comment":"Fastqc report from on trimmed .fastq files",
+            "Cache": true
+        },
+        {
+            "Name": "InputReferenceGenome",
+            "Image": "fjukstad/seqbase",
+            "Cmd": [
+                "sh", "-c", "cp -R /home/data/refined/ref/human_g1k_v37.* /walrus/InputReferenceGenome/"
+            ],
+            "Volumes": [
+                "/home/data/:/home/data" 
+            ], 
+            "MountPropagation":"private",
+            "Cache": true,
+            "Comment":"Copy reference genome" 
+        },
+         {
+            "Name": "TumorMapTrimmed",
+            "Image":"fjukstad/bwa",
+            "Entrypoint":["/bin/sh"],
+            "Cmd":[
+                "-c",
+                "/tools/bwa/bwa mem -t 10 -M /walrus/InputReferenceGenome/human_g1k_v37.fasta /walrus/TumorTrimOriginalDataset/tumor.pair1.fastq /walrus/TumorTrimOriginalDataset/tumor.pair2.fastq > /walrus/TumorMapTrimmed/tumor.sam" 
+            ],
+            "Inputs" : [
+                "TumorTrimOriginalDataset", "InputReferenceGenome" 
+            ],
+            "Comment":"Map trimmed tumor to reference genome",
+            "Cache": true
+        },
+         {
+            "Name": "NormalMapTrimmed",
+            "Image":"fjukstad/bwa",
+            "Entrypoint":["/bin/sh"],
+            "Cmd":[
+                "-c",
+                "/tools/bwa/bwa mem -t 10 -M /walrus/InputReferenceGenome/human_g1k_v37.fasta /walrus/NormalTrimOriginalDataset/normal.pair1.fastq /walrus/NormalTrimOriginalDataset/normal.pair2.fastq > /walrus/NormalMapTrimmed/normal.sam" 
+            ],
+            "Inputs" : [
+                "NormalTrimOriginalDataset", "InputReferenceGenome" 
+            ],
+            "Comment":"Map trimmed normal to reference genome",
+            "Cache": true 
+        },
+        {
+            "Name": "TumorMappedSam2Bam",
+           "Image":"fjukstad/samtools",
+            "Entrypoint":["/bin/sh"],
+            "Cmd":[
+                "-c", 
+                "/usr/bin/samtools view -bS /walrus/TumorMapTrimmed/tumor.sam | /usr/bin/samtools sort - -o /walrus/TumorMappedSam2Bam/tumor.bam" 
+            ],
+            "Inputs" : [
+                "TumorMapTrimmed"
+            ],
+            "Comment":"convert mapped sam file to bam and sort it",
+            "Cache":true 
+        },
+        {
+            "Name": "NormalMappedSam2Bam",
+            "Image":"fjukstad/samtools",
+            "Entrypoint":["/bin/sh"],
+            "Cmd":[
+                "-c",
+                "/usr/bin/samtools view -bS /walrus/NormalMapTrimmed/normal.sam | /usr/bin/samtools sort - -o /walrus/NormalMappedSam2Bam/normal.bam" 
+            ],
+            "Inputs" : [
+                "NormalMapTrimmed"
+            ],
+            "Comment":"convert mapped sam file to bam and sort it",
+            "Cache":true  
+        },
+        {
+            "Name": "TumorBuildBamIndex",
+            "Image":"fjukstad/picard",
+            "Cmd":[
+                "BuildBamIndex", 
+                "INPUT=/walrus/TumorMappedSam2Bam/tumor.bam",
+                "OUTPUT=/walrus/TumorBuildBamIndex/tumor.bai"
+            ],
+            "Inputs" : [
+                "TumorMappedSam2Bam"
+            ],
+            "Comment":"build bam index tumor sample",
+            "Cache":true
+        },
+        {
+            "Name": "NormalBuildBamIndex",
+            "Image":"fjukstad/picard",
+            "Cmd":[
+                "BuildBamIndex", 
+                "INPUT=/walrus/NormalMappedSam2Bam/normal.bam",
+                "OUTPUT=/walrus/NormalBuildBamIndex/normal.bai"
+            ],
+            "Inputs" : [
+                "NormalMappedSam2Bam"
+            ],
+            "Comment":"build bam index normal sample",
+            "Cache":true
+        },
+        {
+            "Name": "TumorMergeBamBai",
+            "Image":"fjukstad/seqbase",
+            "Cmd":[
+                "sh", "-c",
+                "cp /walrus/TumorBuildBamIndex/tumor.bai /walrus/TumorMappedSam2Bam/tumor.bam /walrus/TumorMergeBamBai/"
+            ],
+            "Inputs" : [
+               "TumorBuildBamIndex"
+            ],
+            "Comment":"copies tumor bam and bai files to the same directory",
+            "Cache":true
+        },
+        {
+            "Name": "NormalMergeBamBai",
+            "Image":"fjukstad/seqbase",
+            "Cmd":[
+                "sh", "-c",
+                "cp /walrus/NormalBuildBamIndex/normal.bai /walrus/NormalMappedSam2Bam/normal.bam /walrus/NormalMergeBamBai/"
+            ],
+            "Inputs" : [
+               "NormalBuildBamIndex"
+            ],
+            "Comment":"copies normal bam and bai files to the same directory",
+            "Cache":true
+        }, 
+        {
+           "Name": "TumorAddReadGroups",
+           "Image":"fjukstad/picard",
+           "Cmd":[
+               "AddOrReplaceReadGroups",
+               "INPUT=/walrus/TumorMergeBamBai/tumor.bam",
+               "OUTPUT=/walrus/TumorAddReadGroups/tumor.bam",
+               "SORT_ORDER=coordinate",
+               "ID=HI3840008SSXT96C12",
+               "LB=libHI3840008SSXT96C12",
+               "PL=Illumina",
+               "PU=runHI3840008SSXT96C12",
+               "SM=tumor",
+               "CN=MGGQ"
+           ],
+           "Inputs" : [
+               "TumorMergeBamBai"
+           ],
+           "Comment":"Assigns reads groups to tumor sample (required by GATK tools)",
+          "Cache": true
+        },
+        {
+           "Name": "NormalAddReadGroups",
+           "Image":"fjukstad/picard",
+           "Cmd":[
+               "AddOrReplaceReadGroups",
+               "INPUT=/walrus/NormalMergeBamBai/normal.bam",
+               "OUTPUT=/walrus/NormalAddReadGroups/normal.bam",
+               "SORT_ORDER=coordinate",
+               "ID=HI3840008SSXT96D12",
+               "LB=libHI3840008SSXT96D12",
+               "PL=Illumina",
+               "PU=runHI3840008SSXT96D12",
+               "SM=normal",
+               "CN=MGGQ"
+           ],
+           "Inputs" : [
+               "NormalMergeBamBai"
+           ],
+           "Comment":"Assigns reads groups to normal sample (required by GATK tools)",
+          "Cache": true
+        },
+         {
+          "Name": "TumorMarkDuplicates",
+          "Image":"fjukstad/picard",
+          "Cmd":[
+              "MarkDuplicates",
+              "INPUT=/walrus/TumorAddReadGroups/tumor.bam",
+              "OUTPUT=/walrus/TumorMarkDuplicates/tumor.bam",
+              "METRICS_FILE=/walrus/TumorMarkDuplicates/tumor.metrics.txt"
+          ],
+          "Inputs" : [
+              "TumorAddReadGroups"
+          ],
+          "Comment":"Mark duplicates in tumor bam",
+          "Cache": true
+        },
+         {
+          "Name": "NormalMarkDuplicates",
+          "Image":"fjukstad/picard",
+          "Cmd":[
+              "MarkDuplicates",
+              "INPUT=/walrus/NormalAddReadGroups/normal.bam",
+              "OUTPUT=/walrus/NormalMarkDuplicates/normal.bam",
+              "METRICS_FILE=/walrus/NormalMarkDuplicates/normal.metrics.txt"
+          ],
+          "Inputs" : [
+              "NormalAddReadGroups"
+          ],
+          "Comment":"Mark duplicates in tumor bam",
+          "Cache": true
+        },
+        {
+            "Name": "InputIntervals",
+            "Image": "fjukstad/seqbase",
+            "Cmd": [
+                "sh", "-c", "cp /home/data/refined/SureSelectHumanAllExonV5.targets.bed /walrus/InputIntervals/"
+            ],
+            "Volumes": [
+                "/home/data/:/home/data" 
+            ], 
+            "MountPropagation":"private",
+            "Cache": true,
+            "Comment":"Copy intervals from nanuq into pipeline" 
+        }, 
+        { 
+
+            "Name": "InputKnownIndels",
+            "Image": "fjukstad/seqbase",
+            "Cmd": [
+                "sh", "-c", "cp /home/data/refined/other/broad/1000G_phase1.indels.b37.vcf  /home/data/refined/other/broad/Mills_and_1000G_gold_standard.indels.b37.vcf /home/data/refined/other/broad/dbsnp_138.b37.vcf /walrus/InputKnownIndels/"
+            ],
+            "Volumes": [
+                "/home/data/:/home/data" 
+            ], 
+            "MountPropagation":"private",
+            "Cache":true,
+            "Comment":"Copy known intervals into pipeline" 
+        },
+        {
+            "Name": "TumorMarkDuplicatesBuildBamIndex",
+            "Image":"fjukstad/picard",
+            "Cmd":[
+                "BuildBamIndex", 
+                "INPUT=/walrus/TumorMarkDuplicates/tumor.bam",
+                "OUTPUT=/walrus/TumorMarkDuplicates/tumor.bai"
+            ],
+            "Inputs" : [
+                "TumorMarkDuplicates"
+            ],
+            "Comment":"build bam index for tumor mark duplicates",
+            "Cache":true
+        },
+        {
+            "Name": "NormalMarkDuplicatesBuildBamIndex",
+            "Image":"fjukstad/picard",
+            "Cmd":[
+                "BuildBamIndex", 
+                "INPUT=/walrus/NormalMarkDuplicates/normal.bam",
+                "OUTPUT=/walrus/NormalMarkDuplicates/normal.bai"
+            ],
+            "Inputs" : [
+                "NormalMarkDuplicates"
+            ],
+            "Comment":"build bam index for normal mark duplicates",
+            "Cache": true
+        },
+        {
+          "Name": "TumorRealignerTargetCreator",
+          "Image":"fjukstad/gatk",
+          "Cmd":[
+              "-T", "RealignerTargetCreator",
+              "-R","/walrus/InputReferenceGenome/human_g1k_v37.fasta",
+              "-L","/walrus/InputIntervals/SureSelectHumanAllExonV5.targets.bed",
+              "-known", "/walrus/InputKnownIndels/1000G_phase1.indels.b37.vcf",
+              "-known", "/walrus/InputKnownIndels/Mills_and_1000G_gold_standard.indels.b37.vcf",
+              "-nt", "10",
+              "-I", "/walrus/TumorMarkDuplicates/tumor.bam",
+              "-o","/walrus/TumorRealignerTargetCreator/tumor.intervals"
+          ],
+          "Inputs" : [
+              "InputReferenceGenome", "InputIntervals", "InputKnownIndels", "TumorMarkDuplicatesBuildBamIndex"
+          ],
+          "Comment":"Create indel realigner targets in tumor bam",
+          "Cache": true
+        },
+        {
+          "Name": "NormalRealignerTargetCreator",
+          "Image":"fjukstad/gatk",
+          "Cmd":[
+              "-T", "RealignerTargetCreator",
+              "-R", "/walrus/InputReferenceGenome/human_g1k_v37.fasta",
+              "-L", "/walrus/InputIntervals/SureSelectHumanAllExonV5.targets.bed",
+              "-known", "/walrus/InputKnownIndels/1000G_phase1.indels.b37.vcf",
+              "-known", "/walrus/InputKnownIndels/Mills_and_1000G_gold_standard.indels.b37.vcf",
+              "-nt", "10",
+              "-I", "/walrus/NormalMarkDuplicates/normal.bam",
+              "-o", "/walrus/NormalRealignerTargetCreator/normal.intervals"
+          ],
+          "Inputs" : [
+              "InputReferenceGenome", "InputIntervals", "InputKnownIndels",
+              "NormalMarkDuplicatesBuildBamIndex"
+          ],
+          "Comment":"Mark duplicates in tumor bam",
+          "Cache": true
+        },
+        {
+          "Name": "TumorIndelRealigner",
+          "Image":"fjukstad/gatk",
+          "Cmd":[
+              "-T", "IndelRealigner",
+              "-R","/walrus/InputReferenceGenome/human_g1k_v37.fasta",
+              "-known", "/walrus/InputKnownIndels/1000G_phase1.indels.b37.vcf",
+              "-known", "/walrus/InputKnownIndels/Mills_and_1000G_gold_standard.indels.b37.vcf",
+              "-I", "/walrus/TumorMarkDuplicates/tumor.bam",
+              "-o", "/walrus/TumorIndelRealigner/tumor.bam",
+              "-targetIntervals","/walrus/TumorRealignerTargetCreator/tumor.intervals"
+          ],
+          "Inputs" : [
+              "TumorRealignerTargetCreator"
+          ],
+          "Comment":"Mark duplicates in tumor bam",
+          "Cache": true
+        },
+        {
+          "Name": "NormalIndelRealigner",
+          "Image":"fjukstad/gatk",
+          "Cmd":[
+              "-T", "IndelRealigner",
+              "-R", "/walrus/InputReferenceGenome/human_g1k_v37.fasta",
+              "-known", "/walrus/InputKnownIndels/1000G_phase1.indels.b37.vcf",
+              "-known", "/walrus/InputKnownIndels/Mills_and_1000G_gold_standard.indels.b37.vcf",
+              "-I", "/walrus/NormalMarkDuplicates/normal.bam",
+              "-o", "/walrus/NormalIndelRealigner/normal.bam",
+              "-targetIntervals", "/walrus/NormalRealignerTargetCreator/normal.intervals"
+          ],
+          "Inputs" : [
+              "NormalRealignerTargetCreator"
+          ],
+          "Comment":"Indel realigner normal bam",
+          "Cache": true
+        },
+         {
+            "Name": "TumorIndelRealignerBuildBamIndex",
+            "Image":"fjukstad/picard",
+            "Cmd":[
+                "BuildBamIndex", 
+                "INPUT=/walrus/TumorIndelRealigner/tumor.bam",
+                "OUTPUT=/walrus/TumorIndelRealigner/tumor.bai"
+            ],
+            "Inputs" : [
+                "TumorIndelRealigner"
+            ],
+            "Comment":"build bam index for tumor ",
+            "Cache":true
+        },
+        {
+            "Name": "NormalIndelRealignerBuildBamIndex",
+            "Image":"fjukstad/picard",
+            "Cmd":[
+                "BuildBamIndex", 
+                "INPUT=/walrus/NormalIndelRealigner/normal.bam",
+                "OUTPUT=/walrus/NormalIndelRealigner/normal.bai"
+            ],
+            "Inputs" : [
+                "NormalIndelRealigner"
+            ],
+            "Comment":"build bam index for normal mark duplicates",
+            "Cache": true
+        },
+        {
+          "Name": "TumorBaseRecalibrator",
+          "Image":"fjukstad/gatk",
+          "Cmd":[
+              "-T", "BaseRecalibrator",
+              "-R","/walrus/InputReferenceGenome/human_g1k_v37.fasta",
+              "-L","/walrus/InputIntervals/SureSelectHumanAllExonV5.targets.bed",
+              "-knownSites", "/walrus/InputKnownIndels/1000G_phase1.indels.b37.vcf",
+              "-knownSites", "/walrus/InputKnownIndels/Mills_and_1000G_gold_standard.indels.b37.vcf",
+              "-knownSites", "/walrus/InputKnownIndels/dbsnp_138.b37.vcf",
+              "-I", "/walrus/TumorIndelRealigner/tumor.bam",
+              "-o", "/walrus/TumorBaseRecalibrator/tumor.grp",
+              "-rf" ,"BadCigar"
+          ],
+          "Inputs" : [
+              "TumorIndelRealignerBuildBamIndex"
+          ],
+          "Comment":"tumor base recalibrator",
+          "Cache": true
+        },
+        {
+          "Name": "NormalBaseRecalibrator",
+          "Image":"fjukstad/gatk",
+          "Cmd":[
+              "-T", "BaseRecalibrator",
+              "-R","/walrus/InputReferenceGenome/human_g1k_v37.fasta",
+              "-L","/walrus/InputIntervals/SureSelectHumanAllExonV5.targets.bed",
+              "-knownSites", "/walrus/InputKnownIndels/1000G_phase1.indels.b37.vcf",
+              "-knownSites", "/walrus/InputKnownIndels/Mills_and_1000G_gold_standard.indels.b37.vcf",
+              "-knownSites", "/walrus/InputKnownIndels/dbsnp_138.b37.vcf",
+              "-I", "/walrus/NormalIndelRealigner/normal.bam",
+              "-o", "/walrus/NormalBaseRecalibrator/normal.grp",
+              "-rf" ,"BadCigar"
+          ],
+          "Inputs" : [
+              "NormalIndelRealignerBuildBamIndex"
+          ],
+          "Comment": "normal base recalibrator",
+          "Cache": true 
+        },
+        {
+          "Name": "TumorPrintReads",
+          "Image":"fjukstad/gatk",
+          "Cmd":[
+              "-T", "PrintReads",
+              "-R","/walrus/InputReferenceGenome/human_g1k_v37.fasta",
+              "-I", "/walrus/TumorIndelRealigner/tumor.bam",
+              "--BQSR", "/walrus/TumorBaseRecalibrator/tumor.grp",
+              "-o", "/walrus/TumorPrintReads/tumor.bam"
+          ],
+          "Inputs" : [
+              "TumorBaseRecalibrator"
+          ],
+          "Comment":"tumor print reads",
+          "Cache": true 
+        },
+        {
+          "Name": "NormalPrintReads",
+          "Image":"fjukstad/gatk",
+          "Cmd":[
+              "-T", "PrintReads",
+              "-R","/walrus/InputReferenceGenome/human_g1k_v37.fasta",
+              "-I", "/walrus/NormalIndelRealigner/normal.bam",
+              "--BQSR", "/walrus/NormalBaseRecalibrator/normal.grp",
+              "-o", "/walrus/NormalPrintReads/normal.bam"
+          ],
+          "Inputs" : [
+              "NormalBaseRecalibrator"
+          ],
+          "Comment":"normal print reads",
+          "Cache": true
+        },
+        {
+            "Name": "TumorPrintReadsBuildBamIndex",
+            "Image":"fjukstad/picard",
+            "Cmd":[
+                "BuildBamIndex", 
+                "INPUT=/walrus/TumorPrintReads/tumor.bam",
+                "OUTPUT=/walrus/TumorPrintReads/tumor.bai"
+            ],
+            "Inputs" : [
+                "TumorPrintReads"
+            ],
+            "Comment":"build bam index for tumor print reads results",
+            "Cache":true
+        },
+        {
+            "Name": "NormalPrintReadsBuildBamIndex",
+            "Image":"fjukstad/picard",
+            "Cmd":[
+                "BuildBamIndex", 
+                "INPUT=/walrus/NormalPrintReads/normal.bam",
+                "OUTPUT=/walrus/NormalPrintReads/normal.bai"
+            ],
+            "Inputs" : [
+                "NormalPrintReads"
+            ],
+            "Comment":"build bam index for normal print reads results",
+            "Cache": true
+        },
+        {
+           "Name": "MergeFinal",
+           "Image": "fjukstad/seqbase",
+           "Cmd": [
+               "sh", "-c", "cp -R /walrus/NormalPrintReads/* /walrus/TumorPrintReads/* /walrus/MergeFinal/"
+           ],
+           "Inputs":["TumorPrintReadsBuildBamIndex", "NormalPrintReadsBuildBamIndex"],
+           "MountPropagation":"private",
+           "Cache": true,
+           "Comment":"Merge final preprossesed datasets into a single directory" 
+        },
+        {
+           "Name": "Mutect",
+           "Image": "fjukstad/mutect",
+           "Cmd": [
+               "--analysis_type", "MuTect",
+               "--reference_sequence", "/walrus/InputReferenceGenome/human_g1k_v37.fasta",
+               "--input_file:normal", "/walrus/MergeFinal/normal.bam",
+               "--input_file:tumor", "/walrus/MergeFinal/tumor.bam",
+                "-L","/walrus/InputIntervals/SureSelectHumanAllExonV5.targets.bed",
+                "--out", "/walrus/Mutect/mutect-stats-txt",
+                "--vcf", "/walrus/Mutect/somatic-mutect.vcf"
+           ],
+           "Inputs":[
+               "InputReferenceGenome", "InputIntervals", "MergeFinal"
+           ]
+
+
+        }
+    ]
+}
