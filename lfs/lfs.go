@@ -15,7 +15,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
-	git "github.com/libgit2/git2go"
+	git "gopkg.in/libgit2/git2go.v26"
 
 	"github.com/pkg/errors"
 )
