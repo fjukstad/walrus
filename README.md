@@ -74,13 +74,63 @@ the data into the `.git/lfs` folder. Hopefully this will improve in later
 versions of `git-lfs`. 
 
 # Installation
-## Prerequisites 
-- [git](https://git-scm.com/downloads) and [git-lfs](https://git-lfs.github.com/) 
-  if you want to version control your data.  
-- [go](http://golang.org). 
+## Prerequisites and dependencies 
+We are working on simplifying the installation process. In short you need to
+install [go](http://golang.org), [git-lfs](https://git-lfs.github.com/),
+[libgit2](https://github.com/libgit2/libgit2),
+[git2go](https://github.com/libgit2/git2go), and the Docker Go packages before
+you can install walrus. You also need [cmake](https://cmake.org/) to compile
+libgit2 (install it via your preferred package manager. 
 
-## Install 
-- `go get github.com/fjukstad/walrus`
+### Go 
+Follow the [instructions on golang.org](https://golang.org/doc/install) to
+install Go. You also need to set up your
+[GOPATH](https://github.com/golang/go/wiki/SettingGOPATH). 
+
+### Libgit2 and git2go
+First install `libgit`, specifically version 26.
+```
+wget https://github.com/libgit2/libgit2/archive/v0.26.0.zip
+unzip v0.26.0.zip 
+cd libgit2-0.26.0/
+
+mkdir build && cd build
+cmake ..
+cmake --build . --target install
+```
+
+Make sure that you have added the install directory to your `LD_LIBRARY_PATH`
+before continuing. For example, like this: 
+
+```
+echo "export LD_LIBRARY_PATH=/usr/local/lib" >> ~/.bash_profile
+```
+
+After `libgit2` is installed you can install version 26 of `git2go`
+
+```
+go get gopkg.in/libgit2/git2go.v26
+```
+
+## git-lfs
+Install `git-lfs` following the instructions on the
+[git-lfs](https://git-lfs.github.com/) homepage.
+
+### Docker Go packages 
+We need to do some wrangling of the Docker Go packages before we can install
+walrus.  First download the packages, then remove the `vendor` directories
+before continuing. 
+
+```
+go get -u github.com/docker/docker github.com/docker/distribution
+rm -rf $GOPATH/src/github.com/docker/docker/vendor $GOPATH/src/github.com/docker/distribution/vendor
+```
+
+## walrus 
+
+```
+go get github.com/fjukstad/walrus
+```
 
 # Usage 
 
