@@ -477,7 +477,7 @@ func main() {
 	}
 	if *results {
 		*printPipeline = true
-		*configFilename = *outputDir + "/" + *configFilename
+		*configFilename = *outputDir + "/" + filepath.Base(*configFilename)
 	}
 
 	if *diff != "" {
@@ -627,11 +627,11 @@ func main() {
 
 	log.Println("Pipeline completed in:", p.Runtime)
 
-	completedPipelineDescription := *outputDir + "/" + *configFilename
+	completedPipelineDescription := *outputDir + "/" + filepath.Base(*configFilename)
 
 	err = p.WritePipelineDescription(completedPipelineDescription)
 	if err != nil {
-		log.Println(err)
+		log.Println("ERROR: Could not write pipeline description. ", err)
 		return
 	}
 
