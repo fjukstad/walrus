@@ -91,7 +91,9 @@ install [go](http://golang.org), [git-lfs](https://git-lfs.github.com/),
 [libgit2](https://github.com/libgit2/libgit2),
 [git2go](https://github.com/libgit2/git2go), and the Docker Go packages before
 you can install walrus. You also need [cmake](https://cmake.org/) to compile
-libgit2 (install it via your preferred package manager. 
+libgit2 (install it via your preferred package manager. In addition to the
+instructions below you can also have a look at the [Dockerfile](Dockerfile)
+which lists all the necessary commands. 
 
 #### Go 
 Follow the [instructions on golang.org](https://golang.org/doc/install) to
