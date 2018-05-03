@@ -73,8 +73,19 @@ that `git-lfs` runs on a single CPU. Most of the time spent is simply copying
 the data into the `.git/lfs` folder. Hopefully this will improve in later
 versions of `git-lfs`. 
 
-# Installation
-## Prerequisites and dependencies 
+# Installation and usage
+There are two options for installing and using walrus: install walrus and its
+dependencies natively on your system, or use our walrus Docker image. It may
+sound a bit silly to have a Docker container orchestrate other containers, but
+by sharing the Docker socket (`/var/run/docker.sock`) with the walrus container
+it works!  There are
+[drawbacks](https://www.lvh.io/posts/dont-expose-the-docker-socket-not-even-to-a-container.html)
+to sharing the Docker socket and we only encourage this approach if you want to
+try out walrus without thinking about setting up your own environment. 
+
+
+## Native
+### Prerequisites and dependencies 
 We are working on simplifying the installation process. In short you need to
 install [go](http://golang.org), [git-lfs](https://git-lfs.github.com/),
 [libgit2](https://github.com/libgit2/libgit2),
@@ -82,37 +93,37 @@ install [go](http://golang.org), [git-lfs](https://git-lfs.github.com/),
 you can install walrus. You also need [cmake](https://cmake.org/) to compile
 libgit2 (install it via your preferred package manager. 
 
-### Go 
+#### Go 
 Follow the [instructions on golang.org](https://golang.org/doc/install) to
 install Go. You also need to set up your
 [GOPATH](https://github.com/golang/go/wiki/SettingGOPATH). 
 
-### Libgit2 and git2go
+#### Libgit2 and git2go
 First install `libgit`, specifically version 26.
 ```
-wget https://github.com/libgit2/libgit2/archive/v0.26.0.zip
-unzip v0.26.0.zip 
-cd libgit2-0.26.0/
+    wget https://github.com/libgit2/libgit2/archive/v0.26.0.zip
+    unzip v0.26.0.zip 
+    cd libgit2-0.26.0/
 
-mkdir build && cd build
-cmake ..
-cmake --build . --target install
+    mkdir build && cd build
+    cmake ..
+    cmake --build . --target install
 ```
 
 Make sure that you have added the install directory to your `LD_LIBRARY_PATH`
 before continuing. For example, like this: 
 
 ```
-echo "export LD_LIBRARY_PATH=/usr/local/lib" >> ~/.bash_profile
+    echo "export LD_LIBRARY_PATH=/usr/local/lib" >> ~/.bash_profile
 ```
 
 After `libgit2` is installed you can install version 26 of `git2go`
 
 ```
-go get gopkg.in/libgit2/git2go.v26
+    go get gopkg.in/libgit2/git2go.v26
 ```
 
-## git-lfs
+#### git-lfs
 Install `git-lfs` following the instructions on the
 [git-lfs](https://git-lfs.github.com/) homepage.
 
@@ -122,40 +133,64 @@ walrus.  First download the packages, then remove the `vendor` directories
 before continuing. 
 
 ```
-go get -u github.com/docker/docker github.com/docker/distribution
-rm -rf $GOPATH/src/github.com/docker/docker/vendor $GOPATH/src/github.com/docker/distribution/vendor
+    go get -u github.com/docker/docker github.com/docker/distribution
+    rm -rf $GOPATH/src/github.com/docker/docker/vendor $GOPATH/src/github.com/docker/distribution/vendor
 ```
 
-## walrus 
+### walrus 
 
 ```
-go get github.com/fjukstad/walrus
+    go get github.com/fjukstad/walrus
 ```
 
-# Usage 
-
-`walrus -f $PIPELINE_DESCRIPTION` where `$PIPELINE_DESCRIPTION` is the filename
-of a pipeline description you've created.  
+### Usage 
+Once you have installed walrus you can start analyzing data with 
 
 ```
-$ walrus --help 
-Usage of walrus:
-  -i string
-    	pipeline description file (default "pipeline.json")
-  -lfs-server
-    	start an lfs-server, will not run the pipeline
-  -lfs-server-dir string
-    	host directory to store lfs objects (default "lfs")
-  -logs string
-    	get logs for pipeline stage
-  -o string
-    	where walrus should store output data on the host (default "walrus")
-  -p string
-    	port to run web server for pipeline visualization (default ":9090")
-  -version-control
-    	version control output data automatically (default true)
-  -web
-    	host interactive visualization of the pipeline
+    walrus -i $PIPELINE_DESCRIPTION
+```
+
+where `$PIPELINE_DESCRIPTION` is the filename of a
+pipeline description you've created. For more details run `$ walrus --help`. 
+
+## Docker 
+There's only a single command needed to start analyzing data using the walrus
+Docker container. Let's assume you have a `pipeline.json` pipeline description
+in your working directory. You can analyze it by running
+
+```
+    docker run -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):$(pwd) -t fjukstad/walrus -i $(pwd)/pipeline.json -o $(pwd)/output
+```
+
+and it will write the output to a directory `output/` in your current working
+directory. 
+
+
+While there's a single command you also have to take special care when
+specifying the volumes in your pipeline description.  You must use the full
+path, not just relative path, where your data is on your host. 
+
+Below is a short example to analyze the [fruit_stand
+example](example/fruit_stand), that assumes that you have downloaded walrus to
+your `GOPATH`. Before you can run the pipeline you have to modify one line of
+the first stage in [pipeline.json](example/fruit_stand/pipeline.json) from
+
+```
+    "Volumes": ["data:/data"],
+```
+
+to 
+
+```
+    "Volumes": ["GOPATH/src/github.com/fjukstad/walrus/example/fruit_stand/data:/data"],
+```
+
+where you have to substitute `GOPATH` with your actual GOPATH. If your data is
+elsewhere you'll have to substitute the path with the full path on your system.
+Once you have updated the path you can then run the pipeline using
+
+```
+    docker run -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):$(pwd) -t fjukstad/walrus -i $(pwd)/pipeline.json -o $(pwd)/output
 ```
 
 # Example pipeline
