@@ -139,6 +139,8 @@ before continuing.
     rm -rf $GOPATH/src/github.com/docker/docker/vendor $GOPATH/src/github.com/docker/distribution/vendor
 ```
 
+You also need to set your environment variable `DOCKER_API_VERSION=1.35`. 
+
 ### walrus 
 
 ```
