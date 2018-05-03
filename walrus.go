@@ -422,20 +422,20 @@ func fixMountPaths(stages []*pipeline.Stage) error {
 
 			if strings.HasPrefix(hostPath, "/") {
 				updatedVolumes = append(updatedVolumes, volume)
-				continue
-			}
+			} else {
 
-			absPath, err := filepath.Abs(hostPath)
-			if err != nil {
-				return errors.Wrap(err, "Could not get the absolute path of the mount path")
-			}
+				absPath, err := filepath.Abs(hostPath)
+				if err != nil {
+					return errors.Wrap(err, "Could not get the absolute path of the mount path")
+				}
 
-			mount := absPath + ":" + clientPath
-			if stage.MountPropagation != "" {
-				mount = mount + ":" + stage.MountPropagation
-			}
+				mount := absPath + ":" + clientPath
+				if stage.MountPropagation != "" {
+					mount = mount + ":" + stage.MountPropagation
+				}
 
-			updatedVolumes = append(updatedVolumes, mount)
+				updatedVolumes = append(updatedVolumes, mount)
+			}
 		}
 		stages[i].Volumes = updatedVolumes
 	}
