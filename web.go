@@ -10,16 +10,16 @@ import (
 
 var vis = `
 <head>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/2.7.11/cytoscape.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.2.12/cytoscape.js"></script>
     <script
       src="https://code.jquery.com/jquery-3.1.1.js"
       integrity="sha256-16cdPddA6VdVInumRGo6IbivbERE8p7CQR3HzTBuELA="
       crossorigin="anonymous"></script>
-    <script src="https://cdn.rawgit.com/cpettitt/dagre/v0.7.4/dist/dagre.js"></script>
-    <script src="https://cdn.rawgit.com/cytoscape/cytoscape.js-dagre/master/cytoscape-dagre.js"></script> 
+    <script src="https://unpkg.com/dagre@0.7.4/dist/dagre.js"></script>
+    <script src="https://cytoscape.github.io/cytoscape.js-dagre/cytoscape-dagre.js"></script> 
     <script src="http://cdnjs.cloudflare.com/ajax/libs/qtip2/2.2.0/jquery.qtip.min.js"></script>
     <link href="http://cdnjs.cloudflare.com/ajax/libs/qtip2/2.2.0/jquery.qtip.min.css" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.rawgit.com/cytoscape/cytoscape.js-qtip/2.2.5/cytoscape-qtip.js"></script>
+    <script src="https://cdn.rawgit.com/cytoscape/cytoscape.js-qtip/2.7.1/cytoscape-qtip.js"></script>
     <style>
         #cy {
             width: 100%;
@@ -34,6 +34,9 @@ var vis = `
       container: $('#cy'),
       boxSelectionEnabled: false,
       autounselectify: true,
+	  layout: {
+		  name:'dagre'
+	  }, 
       style: [
       {
           selector: 'node',
@@ -60,9 +63,10 @@ var vis = `
     $.get( "/graph", function( data ) {
         console.log(data) 
         cy.add(JSON.parse(data).elements)
+		console.log(cy.nodes())
         cy.layout({
             name:"dagre"
-        });
+        }).run();
 
         cy.elements().qtip({
             content: function(){
