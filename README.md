@@ -84,6 +84,47 @@ to sharing the Docker socket and we only encourage this approach if you want to
 try out walrus without thinking about setting up your own environment. 
 
 
+## Docker 
+There's only a single command needed to start analyzing data using the walrus
+Docker container. Let's assume you have a `pipeline.json` pipeline description
+in your working directory. You can analyze it by running
+
+```
+    docker run -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):$(pwd) -t fjukstad/walrus -i $(pwd)/pipeline.json -o $(pwd)/output
+```
+
+and it will write the output to a directory `output/` in your current working
+directory. 
+
+
+While there's a single command you also have to take special care when
+specifying the volumes in your pipeline description.  You must use the full
+path, not just relative path, where your data is on your host. 
+
+Below is a short example to analyze the [fruit_stand
+example](example/fruit_stand), that assumes that you have downloaded walrus to
+your `GOPATH`. Before you can run the pipeline you have to modify one line of
+the first stage in [pipeline.json](example/fruit_stand/pipeline.json) from
+
+```
+    "Volumes": ["data:/data"],
+```
+
+to 
+
+```
+    "Volumes": ["GOPATH/src/github.com/fjukstad/walrus/example/fruit_stand/data:/data"],
+```
+
+where you have to substitute `GOPATH` with your actual GOPATH. If your data is
+elsewhere you'll have to substitute the path with the full path on your system.
+Once you have updated the path you can then run the pipeline using
+
+```
+    docker run -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):$(pwd) -t fjukstad/walrus -i $(pwd)/pipeline.json -o $(pwd)/output
+```
+
+
 ## Native
 ### Prerequisites and dependencies 
 We are working on simplifying the installation process. In short you need to
@@ -156,46 +197,6 @@ Once you have installed walrus you can start analyzing data with
 
 where `$PIPELINE_DESCRIPTION` is the filename of a
 pipeline description you've created. For more details run `$ walrus --help`. 
-
-## Docker 
-There's only a single command needed to start analyzing data using the walrus
-Docker container. Let's assume you have a `pipeline.json` pipeline description
-in your working directory. You can analyze it by running
-
-```
-    docker run -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):$(pwd) -t fjukstad/walrus -i $(pwd)/pipeline.json -o $(pwd)/output
-```
-
-and it will write the output to a directory `output/` in your current working
-directory. 
-
-
-While there's a single command you also have to take special care when
-specifying the volumes in your pipeline description.  You must use the full
-path, not just relative path, where your data is on your host. 
-
-Below is a short example to analyze the [fruit_stand
-example](example/fruit_stand), that assumes that you have downloaded walrus to
-your `GOPATH`. Before you can run the pipeline you have to modify one line of
-the first stage in [pipeline.json](example/fruit_stand/pipeline.json) from
-
-```
-    "Volumes": ["data:/data"],
-```
-
-to 
-
-```
-    "Volumes": ["GOPATH/src/github.com/fjukstad/walrus/example/fruit_stand/data:/data"],
-```
-
-where you have to substitute `GOPATH` with your actual GOPATH. If your data is
-elsewhere you'll have to substitute the path with the full path on your system.
-Once you have updated the path you can then run the pipeline using
-
-```
-    docker run -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):$(pwd) -t fjukstad/walrus -i $(pwd)/pipeline.json -o $(pwd)/output
-```
 
 # Example pipeline
 Here's a small example pipeline. It consists of two stages: the first writes all
